@@ -7,6 +7,8 @@ from tkinter.filedialog import askopenfilename
 
 components = range(20)  # number of components to show
 
+
+
 if __name__ == "__main__":
     mpl.use("tkAgg")
     root = Tk()
