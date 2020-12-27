@@ -241,7 +241,7 @@ def annotate_bads_auto(raw, reject_criteria, jump_criteria, reject_criteria_blin
     eye_events = raw._times[sum(abs(data_eog) > reject_criteria_blink) > 0]
     plt.plot(sum(abs(data_eog) > reject_criteria_blink) > 0)
     plt.title("blue-annotations before deleting eye events. orange - only eye events")
-    print("loop length:", len(event_times))
+        #print("loop length:", len(event_times))
     for i in range(2, len(event_times)):  # don't remove adjacent time points or blinks
         if i % 300 == 0: print(i)
         if ((event_times[i] - event_times[i - 1]) < .05) | \
@@ -250,7 +250,7 @@ def annotate_bads_auto(raw, reject_criteria, jump_criteria, reject_criteria_blin
     event_times = np.delete(event_times, extralist)
     event_times = np.append(event_times, raw._times[jumps])  # add jumps
     onsets = event_times - 0.05
-    print("100 ms of data rejected in times:\n", onsets)
+    #print("100 ms of data rejected in times:\n", onsets)
     durations = [0.1] * len(event_times)
     descriptions = ['BAD_data'] * len(event_times)
     annot = mne.Annotations(onsets, durations, descriptions,
