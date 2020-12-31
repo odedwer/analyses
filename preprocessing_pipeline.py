@@ -10,6 +10,7 @@ from SaccadeDetectorType import SaccadeDetectorType
 
 # %%
 raw=mne.io.read_raw_fif(input(),preload=True)
+
 raw.filter(h_freq=None, l_freq=1, n_jobs=12)
 time_rejected=[]
 for i in np.arange(50,260,5):
@@ -92,7 +93,7 @@ event_dict = {'short_scrambled': 110, 'long_scrambled': 112,
               'short_face': 120, 'long_face': 122,
               'short_obj': 130, 'long_obj': 132,
               'short_body': 140, 'long_body': 142} # for cutting trials to ICA
-raw_for_ica = multiply_event(raw,event_dict,events, event_id=event_dict_vis["saccade"],size_new=4)
+raw_for_ica = multiply_event(raw, event_dict, events, saccade_id=event_dict_vis["saccade"], size_new=4)
 
 # %% for saving the multiplied raw file:
 s_num = input("subject number?")
@@ -102,7 +103,7 @@ ica = mne.preprocessing.read_ica(input("file?"))
 
 # %%fit ica
 ica = mne.preprocessing.ICA(n_components=.95, method='infomax',
-                            random_state=97, max_iter=800, fit_params=dict(extended=True))
+                            random_state=97, max_iter=600, fit_params=dict(extended=True))
 ica.fit(raw_for_ica, reject_by_annotation=True, reject=reject_criteria)
 ica.save(
     "SavedResults/S"+input("subject number?")+"/"+input("name?")+"-ica.fif")
@@ -110,8 +111,8 @@ ica.save(
 
 # %%
 ica.plot_sources(raw)
-# stimuli = ['short_scrambled', 'long_scrambled','short_face', 'long_face',
-#            'short_obj', 'long_obj','short_body', 'long_body']
+stimuli = ['short_scrambled', 'long_scrambled','short_face', 'long_face',
+           'short_obj', 'long_obj','short_body', 'long_body']
 stimuli = ['long_word','short_word']
 comp_start = 0  # from which component to start showing
 ica.exclude = plot_ica_component(raw, ica, events, event_dict_vis, stimuli, comp_start)

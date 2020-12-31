@@ -1,6 +1,7 @@
 # %%
 import os
 import pickle
+import autoreject
 from tkinter import *
 from tkinter.filedialog import askopenfilename
 from datetime import datetime
@@ -12,6 +13,9 @@ import matplotlib.pyplot as plt
 import mne
 from h5py import File
 from scipy import stats
+from EyeLinkProcessor import EyeLinkProcessor
+from ParserType import ParserType
+from SaccadeDetectorType import SaccadeDetectorType
 
 
 def save_data(obj, filename):
@@ -39,32 +43,67 @@ def load_data(filename):
 
 def read_bdf_files(preload=True):
     """
-    Reads bdf file from disk. If there are several files, reads them all to different raw objects.
-    GUI will open to choose a file from a folder. Any file in that folder that has the same name of the
-    chosen file up to the last _ in the filename will be added opened as a raw object, by
-    order of names (lexicographic)
     :return: List of the raw objects (preloaded)
     """
-    # TODO: don't concatenate, return list
-    # get file path using GUI
-    Tk().withdraw()
-    filename = askopenfilename(title="Please choose ")
-    filenames = []
-    dir_path = os.path.dirname(filename)
-    just_filename = os.path.basename(filename)
-    count = 0
-    for cur_filename in os.listdir(dir_path):
-        if just_filename[:just_filename.rfind('_')] == cur_filename[:cur_filename.rfind('_')] and cur_filename[
-                                                                                                  -3:] == "bdf":
-            filenames.append(cur_filename)
-            count += 1
-    print("Found", count, " BDF files.")
-    # open file as RAW object, preload data into memory
-    ret = []
-    for file_name in sorted(filenames):
-        if ret is not None:
-            ret.append(mne.io.read_raw_bdf(os.path.join(dir_path, file_name), preload=preload))
-    return ret
+    global subject_num, modality
+    subject_string = f"sub-{subject_num}"
+    filename = join(BASE_DATA_DIR, subject_string, "eeg", "raw", subject_string + "_task-" + modality + "-raw.bdf")
+    return mne.io.read_raw_bdf(filename, preload=preload)
+
+
+def get_from_argv(idx, msg):
+    if len(argv) < idx + 1:
+        arg = input(msg)
+    else:
+        arg = argv[idx]
+    return arg
+
+
+def get_subject_number():
+    return get_from_argv(SUBJECT_NUMBER_IDX, SUBJECT_MSG)
+
+
+def get_highpass_cutoff():
+    return float(get_from_argv(HIGH_PASS_IDX, HPF_MSG))
+
+
+def get_modality():
+    modality = get_from_argv(MODALIDY_IDX, MODALITY_MSG).lower()
+    while modality not in VALID_MODALITIES:
+        print(MODALITY_ERR_MSG)
+        modality = input(MODALITY_MSG).lower()
+    return modality
+
+
+#
+# def read_bdf_files(preload=True):
+#     """
+#     Reads bdf file from disk. If there are several files, reads them all to different raw objects.
+#     GUI will open to choose a file from a folder. Any file in that folder that has the same name of the
+#     chosen file up to the last _ in the filename will be added opened as a raw object, by
+#     order of names (lexicographic)
+#     :return: List of the raw objects (preloaded)
+#     """
+#     # don't concatenate, return list
+#     # get file path using GUI
+#     Tk().withdraw()
+#     filename = askopenfilename(title="Please choose ")
+#     filenames = []
+#     dir_path = os.path.dirname(filename)
+#     just_filename = os.path.basename(filename)
+#     count = 0
+#     for cur_filename in os.listdir(dir_path):
+#         if just_filename[:just_filename.rfind('_')] == cur_filename[:cur_filename.rfind('_')] and cur_filename[
+#                                                                                                   -3:] == "bdf":
+#             filenames.append(cur_filename)
+#             count += 1
+#     print("Found", count, " BDF files.")
+#     # open file as RAW object, preload data into memory
+#     ret = []
+#     for file_name in sorted(filenames):
+#         if ret is not None:
+#             ret.append(mne.io.read_raw_bdf(os.path.join(dir_path, file_name), preload=preload))
+#     return ret
 
 
 def set_reg_eog(raw, add_channels=[]):
@@ -241,7 +280,7 @@ def annotate_bads_auto(raw, reject_criteria, jump_criteria, reject_criteria_blin
     eye_events = raw._times[sum(abs(data_eog) > reject_criteria_blink) > 0]
     plt.plot(sum(abs(data_eog) > reject_criteria_blink) > 0)
     plt.title("blue-annotations before deleting eye events. orange - only eye events")
-        #print("loop length:", len(event_times))
+    # print("loop length:", len(event_times))
     for i in range(2, len(event_times)):  # don't remove adjacent time points or blinks
         if i % 300 == 0: print(i)
         if ((event_times[i] - event_times[i - 1]) < .05) | \
@@ -250,7 +289,7 @@ def annotate_bads_auto(raw, reject_criteria, jump_criteria, reject_criteria_blin
     event_times = np.delete(event_times, extralist)
     event_times = np.append(event_times, raw._times[jumps])  # add jumps
     onsets = event_times - 0.05
-    #print("100 ms of data rejected in times:\n", onsets)
+    # print("100 ms of data rejected in times:\n", onsets)
     durations = [0.1] * len(event_times)
     descriptions = ['BAD_data'] * len(event_times)
     annot = mne.Annotations(onsets, durations, descriptions,
@@ -347,8 +386,8 @@ def plot_ica_component(raw, ica, events, event_dict, stimuli, comp_start):
             now = datetime.now()
             set_type = {i: 'eeg' for i in ica_raw.ch_names}  # setting ica_raw
             ica_raw.set_channel_types(mapping=set_type)
-         #   self.ica.plot_properties(epochs[stimuli], picks=index, show=False,
-          #                           psd_args={'fmax': 100})  # plot component properties
+            #   self.ica.plot_properties(epochs[stimuli], picks=index, show=False,
+            #                           psd_args={'fmax': 100})  # plot component properties
             # self.fig, self.ax = config_plot()
             [[self.ax[i, j].clear() for j in range(3)] for i in range(2)]  # clear current axes
             self.fig.suptitle("Component " + str(index) + " - zoom in subplots for detail", fontsize=12)
@@ -384,17 +423,19 @@ def plot_ica_component(raw, ica, events, event_dict, stimuli, comp_start):
             # TF
             power_saccade = tfr_morlet(epochs_ica['saccade'], freqs=freqs, average=False,
                                        n_cycles=np.round(np.log((freqs + 13) / 10) * 10), use_fft=True,
-                                       return_itc=False, picks=0,decim=3, n_jobs=12)
+                                       return_itc=False, picks=0, decim=3, n_jobs=12)
             TFR_s = power_saccade.average().data
-            times_s = power_saccade.average().times[0:len(TFR_s[0, 0]):55]; times_s=times_s[1:-1]
+            times_s = power_saccade.average().times[0:len(TFR_s[0, 0]):55];
+            times_s = times_s[1:-1]
             TFR_s_corrected = (TFR_s[0].transpose() - (np.mean(TFR_s[0][:, 40:100], axis=1))).transpose()
-            self.ax[0, 2].imshow((TFR_s_corrected[:,55:340]), cmap='jet', origin='lowest', aspect='auto')
+            self.ax[0, 2].imshow((TFR_s_corrected[:, 55:340]), cmap='jet', origin='lowest', aspect='auto')
             self.ax[0, 2].set_title('Saccade-locked TF')
             self.ax[0, 2].set_ylabel('Hz')
             self.ax[0, 2].set_xlabel('Time (s)')
             self.ax[0, 2].set_yticks(list(freqs_to_show))
             self.ax[0, 2].set_yticklabels(np.round(freqs[freqs_to_show]))
-            time_vec = np.arange(len(TFR_s[0, 0]))[0:len(TFR_s[0, 0]):55];time_vec=time_vec[1:-1]-55
+            time_vec = np.arange(len(TFR_s[0, 0]))[0:len(TFR_s[0, 0]):55];
+            time_vec = time_vec[1:-1] - 55
             self.ax[0, 2].set_xticks(list(time_vec))
             self.ax[0, 2].set_xticklabels(np.round(times_s, 1))
 
@@ -402,15 +443,17 @@ def plot_ica_component(raw, ica, events, event_dict, stimuli, comp_start):
                                      n_cycles=np.round(np.log((freqs + 13) / 10) * 10), use_fft=True,
                                      return_itc=False, picks=0, decim=3, n_jobs=12)
             TFR_t = power_trial.average().data
-            times_t = power_trial.average().times[0:len(power_saccade.average().times):55]; times_t=times_t[1:-1]
+            times_t = power_trial.average().times[0:len(power_saccade.average().times):55];
+            times_t = times_t[1:-1]
             TFR_t_corrected = (TFR_t[0].transpose() - (np.mean(TFR_t[0][:, 40:100], axis=1))).transpose()
-            self.ax[0, 0].imshow((TFR_t_corrected[:,55:340]), cmap='jet', origin='lowest', aspect='auto')
+            self.ax[0, 0].imshow((TFR_t_corrected[:, 55:340]), cmap='jet', origin='lowest', aspect='auto')
             self.ax[0, 0].set_title('Stimulus-locked TF')
             self.ax[0, 0].set_ylabel('Hz')
             self.ax[0, 0].set_xlabel('Time (s)')
             self.ax[0, 0].set_yticks(list(freqs_to_show))
             self.ax[0, 0].set_yticklabels(np.round(freqs[freqs_to_show]))
-            time_vec = np.arange(len(TFR_t[0, 0]))[0:len(TFR_t[0, 0]):55];time_vec=time_vec[1:-1]-55
+            time_vec = np.arange(len(TFR_t[0, 0]))[0:len(TFR_t[0, 0]):55];
+            time_vec = time_vec[1:-1] - 55
             self.ax[0, 0].set_xticks(list(time_vec))
             self.ax[0, 0].set_xticklabels(np.round(times_t, 1))
 
@@ -418,9 +461,10 @@ def plot_ica_component(raw, ica, events, event_dict, stimuli, comp_start):
                                      n_cycles=np.round(np.log((freqs + 13) / 10) * 10), use_fft=True,
                                      return_itc=False, picks=0, decim=3, n_jobs=12)
             TFR_b = power_blink.average().data
-            times_b = power_blink.average().times[0:len(power_blink.average().times):55]; times_b=times_b[1:-1]
+            times_b = power_blink.average().times[0:len(power_blink.average().times):55];
+            times_b = times_b[1:-1]
             TFR_b_corrected = (TFR_b[0].transpose() - (np.mean(TFR_b[0][:, 40:100], axis=1))).transpose()
-            self.ax[0, 1].imshow((TFR_b_corrected[:,55:340]), cmap='jet', origin='lowest', aspect='auto')
+            self.ax[0, 1].imshow((TFR_b_corrected[:, 55:340]), cmap='jet', origin='lowest', aspect='auto')
             self.ax[0, 1].set_title('Blink-locked TF')
             self.ax[0, 1].set_ylabel('Hz')
             self.ax[0, 1].set_xlabel('Time (s)')
@@ -525,7 +569,7 @@ def ica_checker(raw, ica):
             break
 
 
-def multiply_event(raw, event_dict, events, event_id=98,
+def multiply_event(raw, event_dict, events, saccade_id=98,
                    cut_before_event=30 / 1000, cut_after_event=50 / 1000,
                    cut_epochs=1.7, size_new=1):
     """
@@ -540,21 +584,21 @@ def multiply_event(raw, event_dict, events, event_id=98,
     :param cut_after_event: how much to cut before event
     :param cut_before_event: how much to cut after event
     :param raw: original raw file
-    :param event_id: the name of the event to cut (saccades usually)
+    :param saccade_id: the name of the event to cut (saccades usually)
     :param event_dict: numbers of stimulus onsets (will be at the dictionary of events)
     :param size_new: integer. how many times should i multiply the raws list
     :return: the new concatenated raw file
     """
 
     raw.load_data()
-    epochs_saccades = mne.Epochs(raw, events, event_id=event_id,
+    epochs_saccades = mne.Epochs(raw, events, event_id=saccade_id,
                                  tmin=-cut_before_event, tmax=cut_after_event,
                                  baseline=(-cut_before_event, cut_after_event),
                                  reject_tmin=-cut_before_event, reject_tmax=cut_after_event,
                                  # reject based on 100 ms before trial onset and 1500 after
                                  preload=True,
                                  reject_by_annotation=True)  # currently includes mean-centering - should we?
-
+    epochs_saccades.plot()
     data_s = np.hstack(epochs_saccades.get_data())
     data_s = np.hstack([data_s.copy() for _ in range(size_new)])
     print("Shape of saccades data:", data_s.shape)
@@ -562,9 +606,17 @@ def multiply_event(raw, event_dict, events, event_id=98,
 
     epochs_trials = mne.Epochs(raw, events, event_id=event_dict,
                                tmin=-.1, tmax=cut_epochs,
-                               baseline=(-.1, cut_epochs), reject_tmin=0, reject_tmax=cut_epochs,  # reject based on 100 ms before trial onset and 1500 after
+                               baseline=(-.1, cut_epochs), reject_tmin=0, reject_tmax=cut_epochs,
+                               # reject based time between trial onset and 1500 after
                                preload=True,
                                reject_by_annotation=True)  # currently includes mean-centering - should we?
+
+    threshold = autoreject.get_rejection_threshold(epochs_trials)
+    threshold['eeg'] *= 2
+    n_trials = len(epochs)
+    epochs_trials.drop_bad(reject=threshold)
+    print(f"removed {n_trials - len(epochs_trials)} trials by peak to peak rejection with threshold {threshold['eeg']}")
+    epochs_trials.plot()
     data_t = np.hstack(epochs_trials.get_data())
 
     print("Shape of trials data:", data_t.shape)
@@ -575,27 +627,50 @@ def multiply_event(raw, event_dict, events, event_id=98,
     #     raw_multiplied = mne.concatenate_raws([raw_multiplied, raw_for_ica])
     #     print(f"length is multiplied by {i + 2}")
 
-    return raw_multiplied
+    return (raw_multiplied,threshold)
 
 
-
-
-
-def duration_tracking(epo_A, epo_B, time_diff,p_thresh=0.01):
+def duration_tracking(epo_A, epo_B, time_diff, p_thresh=0.01):
     """
     Calculates duration tracking score by point-by point t-test. after deriving t and p-value, get
     :return:dt_scores - the mean of above threshold t-tests.
     """
 
-    samples_of_int = (epo_A.times>time_diff[0]) & (epo_A.times<time_diff[1]) # take only the timepoints of interest
-    n_points = sum(samples_of_int)#number of points of interest for later normaliztion of DT scores
+    samples_of_int = (epo_A.times > time_diff[0]) & (epo_A.times < time_diff[1])  # take only the timepoints of interest
+    n_points = sum(samples_of_int)  # number of points of interest for later normaliztion of DT scores
     t_tests = stats.ttest_ind(epo_A.get_data(picks='eeg'), epo_B.get_data(picks='eeg'))
-    t_vals = t_tests.statistic[:,samples_of_int]  # size N_electrodes & N_timepoints - subset for timepoints of interest
-    p_vals = t_tests.pvalue[:,samples_of_int]
+    t_vals = t_tests.statistic[:,
+             samples_of_int]  # size N_electrodes & N_timepoints - subset for timepoints of interest
+    p_vals = t_tests.pvalue[:, samples_of_int]
     p_vals_sig = p_vals < p_thresh
-    dt_scores = np.sum(t_vals * p_vals_sig,axis=1)/n_points # send insignificant t's to zero for the summation
+    dt_scores = np.sum(t_vals * p_vals_sig, axis=1) / n_points  # send insignificant t's to zero for the summation
 
     return (dt_scores)
 
+def add_eytracker_triggers(raw,et_file):
+    """
+    :string et_file: the path to eye tracker file
+    raw: the raw file which the ET file matches
+    :return: the raw file with the new triggers
+    """
+    # %% set events
+    et_processor = EyeLinkProcessor(et_file, ParserType.MONOCULAR_NO_VELOCITY,
+                                    SaccadeDetectorType.ENGBERT_AND_MERGENTHALER)
+    et_processor.sync_to_raw(raw)
+    saccade_times = et_processor.get_synced_microsaccades()
+    blink_times = et_processor.get_synced_blinks()
+    fixation_times = et_processor.get_synced_fixations()
+    # check sync - shold see that orange markers have close blue lines from the EEG
+    eog_events = mne.preprocessing.find_eog_events(raw, 998)
+    plt.plot(np.sum([np.arange(len(raw._data[0])) == i for i in eog_events[:, 0]], axis=0))  # EOG channel events
+    plt.plot(np.in1d(np.arange(len(raw.get_data(1)[0])), blink_times), linewidth=.7)  # blink triggers
 
-
+    # %% add triggers to data
+    saccade_times = np.sort(np.concatenate([saccade_times, saccade_times + 1, saccade_times + 2]))  # make them longer
+    blink_times = np.sort(np.concatenate([blink_times, blink_times + 1, blink_times + 2]))  # make them longer
+    fixation_times = np.sort(
+        np.concatenate([fixation_times, fixation_times + 1, fixation_times + 2]))  # make them longer
+    raw._data[raw.ch_names.index("Status")][blink_times.astype(np.int)] = 99  # set blinks
+    raw._data[raw.ch_names.index("Status")][saccade_times.astype(np.int)] = 98  # set saccades
+    raw._data[raw.ch_names.index("Status")][fixation_times.astype(np.int)] = 97  # set fixations
+    return (raw)
