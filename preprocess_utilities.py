@@ -41,40 +41,6 @@ def load_data(filename):
         return pickle.load(save_file)
 
 
-def read_bdf_files(preload=True):
-    """
-    :return: List of the raw objects (preloaded)
-    """
-    global subject_num, modality
-    subject_string = f"sub-{subject_num}"
-    filename = join(BASE_DATA_DIR, subject_string, "eeg", "raw", subject_string + "_task-" + modality + "-raw.bdf")
-    return mne.io.read_raw_bdf(filename, preload=preload)
-
-
-def get_from_argv(idx, msg):
-    if len(argv) < idx + 1:
-        arg = input(msg)
-    else:
-        arg = argv[idx]
-    return arg
-
-
-def get_subject_number():
-    return get_from_argv(SUBJECT_NUMBER_IDX, SUBJECT_MSG)
-
-
-def get_highpass_cutoff():
-    return float(get_from_argv(HIGH_PASS_IDX, HPF_MSG))
-
-
-def get_modality():
-    modality = get_from_argv(MODALIDY_IDX, MODALITY_MSG).lower()
-    while modality not in VALID_MODALITIES:
-        print(MODALITY_ERR_MSG)
-        modality = input(MODALITY_MSG).lower()
-    return modality
-
-
 #
 # def read_bdf_files(preload=True):
 #     """
@@ -613,7 +579,8 @@ def multiply_event(raw, event_dict, events, saccade_id=98,
 
     threshold = autoreject.get_rejection_threshold(epochs_trials)
     threshold['eeg'] *= 2
-    n_trials = len(epochs)
+    threshold['eog'] *= 3
+    n_trials = len(epochs_trials)
     epochs_trials.drop_bad(reject=threshold)
     print(f"removed {n_trials - len(epochs_trials)} trials by peak to peak rejection with threshold {threshold['eeg']}")
     epochs_trials.plot()
@@ -664,12 +631,12 @@ def add_eytracker_triggers(raw,et_file):
     eog_events = mne.preprocessing.find_eog_events(raw, 998)
     plt.plot(np.sum([np.arange(len(raw._data[0])) == i for i in eog_events[:, 0]], axis=0))  # EOG channel events
     plt.plot(np.in1d(np.arange(len(raw.get_data(1)[0])), blink_times), linewidth=.7)  # blink triggers
-
+    plt.show()
     # %% add triggers to data
-    saccade_times = np.sort(np.concatenate([saccade_times, saccade_times + 1, saccade_times + 2]))  # make them longer
-    blink_times = np.sort(np.concatenate([blink_times, blink_times + 1, blink_times + 2]))  # make them longer
+    saccade_times = np.sort(np.concatenate([saccade_times, saccade_times + 1, saccade_times + 2, saccade_times + 3]))  # make them longer
+    blink_times = np.sort(np.concatenate([blink_times, blink_times + 1, blink_times + 2, blink_times + 3]))  # make them longer
     fixation_times = np.sort(
-        np.concatenate([fixation_times, fixation_times + 1, fixation_times + 2]))  # make them longer
+        np.concatenate([fixation_times, fixation_times + 1, fixation_times + 2,fixation_times + 3]))  # make them longer
     raw._data[raw.ch_names.index("Status")][blink_times.astype(np.int)] = 99  # set blinks
     raw._data[raw.ch_names.index("Status")][saccade_times.astype(np.int)] = 98  # set saccades
     raw._data[raw.ch_names.index("Status")][fixation_times.astype(np.int)] = 97  # set fixations

@@ -221,10 +221,15 @@ class EyeLinkProcessor:
         """
         a = np.asarray(a)
         b = np.asarray(b)
+        print(a.shape)
+        print(b.shape)
         min_len_arr, max_len_arr = (a, b) if a.size < b.size else (b, a)
         j = 0
         min_arr_idx, max_arr_idx = [], []
-        for i in range(min_len_arr.size):
+
+        for i in range(min_len_arr.shape[0]):
+            if j >= max_len_arr.size:
+                break
             if min_len_arr[i] == max_len_arr[j]:  # match on i,j
                 min_arr_idx.append(i)
                 max_arr_idx.append(j)
@@ -236,8 +241,6 @@ class EyeLinkProcessor:
                 min_arr_idx.append(i)
                 max_arr_idx.append(j + idx)
                 j += idx + 1  # update to next sequential possible common element
-            if j >= max_len_arr.size:
-                break
         min_arr_idx = np.asarray(min_arr_idx)
         max_arr_idx = np.asarray(max_arr_idx)
         return (max_len_arr[max_arr_idx], min_arr_idx, max_arr_idx) if a.size < b.size else (
@@ -362,9 +365,10 @@ class EyeLinkProcessor:
                     resampling_factor[b] = total_time2 / total_time1
                     found = True
                 # If it's hard to find such an event, something is wrong:
-                if i > np.ceil(len(eeg_common_idx) * 0.75):
+                if i > np.ceil(eeg_common_idx.size * 0.75):
                     problem = f'Matched EEG-ET recording block {b}: failed to fine-tune sampling rates of ET vs. EEG.'
                     print(problem, file=stderr)
+                    continue
             eeg_latencies = np.round(eeg_latencies * resampling_factor[b]).astype(np.int)
             eeg_latencies[eeg_latencies < 1] = 1
             eeg_block = np.zeros(eeg_block.size)
@@ -489,10 +493,10 @@ class EyeLinkProcessor:
 
         # Generate EEG event time course
         eeg_data_trig_ch = np.squeeze((raw['Status'])[0])
-        eeg_data_trigs = find_events(raw, mask=255, mask_type="and")  # read events
+        eeg_data_trigs = find_events(raw, mask=255, mask_type="and", min_duration=1/raw.info['sfreq'])  # read events
         eeg_trigs = np.zeros_like(eeg_data_trig_ch, dtype=np.int)
         eeg_trigs[eeg_data_trigs[:, 0]] = eeg_data_trigs[:, 2]  # transform events into eeg_data long vector
         # transform et events into et_num_samples long vector
         et_trig_ch = np.zeros(et_samples[-1, 0])
         et_trig_ch[et_trigs[:, 0]] = et_trigs[:, 1]
-        return eeg_data_trig_ch, eeg_sf, eeg_trigs, et_samples, et_sf, et_timediff, et_trigs, et_trig_ch
+        return eeg_data_trig_ch.astype(np.int32), eeg_sf, eeg_trigs.astype(np.int32), et_samples, et_sf, et_timediff, et_trigs.astype(np.int32), et_trig_ch.astype(np.int32)

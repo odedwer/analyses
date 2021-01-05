@@ -1,12 +1,12 @@
 # %
 # ##import
 import numpy as np
-from preprocess_utilities import *
 import matplotlib
+from preprocess_utilities import *
 from EyeLinkProcessor import EyeLinkProcessor
 from ParserType import ParserType
 from SaccadeDetectorType import SaccadeDetectorType
-# matplotlib.use('Qt5Agg')
+
 
 # %%
 raw=mne.io.read_raw_fif(input(),preload=True)

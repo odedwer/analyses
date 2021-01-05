@@ -5,10 +5,43 @@ saves the rejected components, the clean raw file and the clean epochs
 from sys import argv
 from os.path import join
 import pandas as pd
-from preprocess_utilities import *
 import matplotlib
-
 matplotlib.use('Qt5Agg')
+from preprocess_utilities import *
+# %% functions
+def read_bdf_files(preload=True):
+    """
+    :return: List of the raw objects (preloaded)
+    """
+    global subject_num, modality
+    subject_string = f"sub-{subject_num}"
+    filename = join(BASE_DATA_DIR, subject_string, "eeg", "raw", subject_string + "_task-" + modality + "-raw.bdf")
+    return mne.io.read_raw_bdf(filename, preload=preload)
+def read_fif_files(preload=True):
+    """
+    :return: List of the raw objects (preloaded)
+    """
+    global subject_num, modality
+    subject_string = f"sub-{subject_num}"
+    filename = join(BASE_DATA_DIR, subject_string, "eeg", "raw", subject_string + "_task-" + modality + "-raw.fif")
+    return mne.io.read_raw_bdf(filename, preload=preload)
+def get_from_argv(idx, msg):
+    if len(argv) < idx + 1:
+        arg = input(msg)
+    else:
+        arg = argv[idx]
+    return arg
+def get_subject_number():
+    return get_from_argv(SUBJECT_NUMBER_IDX, SUBJECT_MSG)
+def get_highpass_cutoff():
+    return float(get_from_argv(HIGH_PASS_IDX, HPF_MSG))
+def get_modality():
+    modality = get_from_argv(MODALIDY_IDX, MODALITY_MSG).lower()
+    while modality not in VALID_MODALITIES:
+        print(MODALITY_ERR_MSG)
+        modality = input(MODALITY_MSG).lower()
+    return modality
+
 
 # %% params
 MODALITY_ERR_MSG = "You did not enter a correct modality. Please attempt again:"
