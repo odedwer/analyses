@@ -52,7 +52,7 @@ TRIG_DICT = {'short_body':11, 'long_body':13,
              'short_pattern':41,'long_pattern':43,
              'short_object':51,'long_object':53,}
 ET_TRIG_DICT = {'blink': 99, 'saccade': 98, 'fixation': 97}
-OVERWEIGHT = 3  # How many times to overweight saccades
+OVERWEIGHT = 5  # How many times to overweight saccades
 SUBJECT_NUMBER_IDX = 1
 MODALIDY_IDX = 2
 HIGH_PASS_IDX = 3
@@ -75,9 +75,9 @@ raw_for_ica, threshold_autoreject = multiply_event(raw, TRIG_DICT, events,
                                                    saccade_id=ET_TRIG_DICT["saccade"], size_new=OVERWEIGHT)
 
 
-# %% fit ICA
+# %% fit ICA - ameen run this
 ica = mne.preprocessing.ICA(n_components=.95, method='infomax',
-                            random_state=97, max_iter=600, fit_params=dict(extended=True))
+                            random_state=97, max_iter=800, fit_params=dict(extended=True))
 ica.fit(raw_for_ica, reject_by_annotation=True, reject=threshold_autoreject)
 
 ica.save(join(save_dir, f"sub-{subject_num}_task-{modality}-{low_cutoff_freq:.2f}hpf-overweighted-ica.fif"))

@@ -42,7 +42,6 @@ def get_modality():
         modality = input(MODALITY_MSG).lower()
     return modality
 
-
 # %% params
 MODALITY_ERR_MSG = "You did not enter a correct modality. Please attempt again:"
 VALID_MODALITIES = ['visual', 'auditory']
@@ -50,10 +49,11 @@ MODALITY_MSG = "Please enter the modality (auditory/visual): "
 HPF_MSG = "Please enter the higphass filter cutoff: "
 SUBJECT_MSG = "Please enter the subject number: "
 BASE_DATA_DIR = "S:\Lab-Shared\Experiments\HighDenseGamma\data"
-TRIG_DICT = {'short_scrambled': 110, 'long_scrambled': 112,
-             'short_face': 120, 'long_face': 122,
-             'short_obj': 130, 'long_obj': 132,
-             'short_body': 140, 'long_body': 142}
+TRIG_DICT = {'short_body':11, 'long_body':13,
+             'short_face':21,'long_face':23,
+             'short_place':31,'long_place':33,
+             'short_pattern':41,'long_pattern':43,
+             'short_object':51,'long_object':53,}
 ET_TRIG_DICT = {'blink': 99, 'saccade': 98, 'fixation': 97}
 OVERWEIGHT = 5  # How many times to overweight saccades
 SUBJECT_NUMBER_IDX = 1
@@ -73,10 +73,10 @@ raw_filtered = mne.io.read_raw_fif(join(save_dir, filtered_filename), preload=Tr
 raw_unfiltered = mne.io.read_raw_fif(join(save_dir, unfiltered_filename), preload=True)
 ica = mne.preprocessing.read_ica(join(save_dir, ica_filename))
 raw_unfiltered.info['bads'] = raw_filtered.info['bads']
-raw_unfiltered.annotations = raw_filtered.annotations
+raw_unfiltered._annotations = raw_filtered._annotations
 
 # %% inspect
-ica.plot_sources(raw)
+ica.plot_sources(raw_filtered)
 stimuli = ['short_scrambled', 'long_scrambled', 'short_face', 'long_face',
            'short_obj', 'long_obj', 'short_body', 'long_body']
 if modality == 'auditory':

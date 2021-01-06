@@ -281,6 +281,54 @@ def annotate_breaks(raw, trig=254, samp_rate=2048):
     return raw
 
 
+def fixation_saccade_variance_ratio(raw, ica, events, cut_before_event=10 / 1000, cut_after_event_sac=50 / 1000,
+                                    cut_after_event_fix=350 / 1000,et_trig_dict={'blink': 99, 'saccade': 98, 'fixation': 97}):
+    """
+    Create the projected ica sources and epoch them by saccades and fixation.
+    calculate the overall variance of both epochs for each component and plot their ratio, with a line marking 1.1
+    on the graph. Will be used to decide on components exclusion like Dimigen (2020, Neuroimage).
+
+    :param raw: the filtered raw data
+    :param ica: the ica file calculated on overweighted data
+    :param events: events files after adding ET triggers
+    :param et_trig_dict: the trigger names
+    :return: variance per channel during fixation/during saccades
+    """
+    source_raw = ica.get_sources(raw)
+    source_raw._annotations = raw._annotations
+
+    epochs_saccade = mne.Epochs(source_raw, events, event_id=et_trig_dict["saccade"],
+                                tmin=-cut_before_event, tmax=cut_after_event_sac,
+                                baseline=(-cut_before_event, cut_after_event_sac),
+                                reject_tmin=-cut_before_event, reject_tmax=cut_after_event_sac,
+                                preload=True, reject_by_annotation=True)
+    epochs_fixation = mne.Epochs(source_raw, events, event_id=et_trig_dict["fixation"],
+                                tmin=-cut_before_event, tmax=cut_after_event_fix,
+                                baseline=(-cut_before_event, cut_after_event_fix),
+                                reject_tmin=-cut_before_event, reject_tmax=cut_after_event_fix,
+                                preload=True, reject_by_annotation=True)
+
+    data_fix = np.hstack(epochs_fixation.get_data())
+    print("Shape of fixtation data:", data_fix.shape)
+    raw_fix = mne.io.RawArray(data_fix, source_raw.info)
+
+    data_sac = np.hstack(epochs_saccade.get_data())
+    print("Shape of saccade data:", data_sac.shape)
+    raw_sac = mne.io.RawArray(data_sac, source_raw.info)
+
+    fixation_var = np.var(data_fix,axis=1)
+    saccade_var = np.var(data_sac,axis=1)
+
+    var_ratio = saccade_var/fixation_var
+    plt.bar(x=source_raw.ch_names, height=var_ratio, color="darkblue")
+    plt.axhline(y=1.1, color='red')
+    plt.ylabel("Variance ratio fix/sac")
+    plt.xlabel("ICA component")
+    plt.show()
+    raw_fix.plot(title="fixation epochs")
+    raw_sac.plot(title="saccade epochs")
+    return dict(zip(source_raw.ch_names,var_ratio))
+
 def plot_ica_component(raw, ica, events, event_dict, stimuli, comp_start):
     """
     plot a component -
@@ -562,8 +610,7 @@ def multiply_event(raw, event_dict, events, saccade_id=98,
                                  baseline=(-cut_before_event, cut_after_event),
                                  reject_tmin=-cut_before_event, reject_tmax=cut_after_event,
                                  # reject based on 100 ms before trial onset and 1500 after
-                                 preload=True,
-                                 reject_by_annotation=True)  # currently includes mean-centering - should we?
+                                 preload=True, reject_by_annotation=True)  # currently includes mean-centering - should we?
     epochs_saccades.plot()
     data_s = np.hstack(epochs_saccades.get_data())
     data_s = np.hstack([data_s.copy() for _ in range(size_new)])
@@ -594,7 +641,7 @@ def multiply_event(raw, event_dict, events, saccade_id=98,
     #     raw_multiplied = mne.concatenate_raws([raw_multiplied, raw_for_ica])
     #     print(f"length is multiplied by {i + 2}")
 
-    return (raw_multiplied,threshold)
+    return (raw_multiplied, threshold)
 
 
 def duration_tracking(epo_A, epo_B, time_diff, p_thresh=0.01):
@@ -614,7 +661,8 @@ def duration_tracking(epo_A, epo_B, time_diff, p_thresh=0.01):
 
     return (dt_scores)
 
-def add_eytracker_triggers(raw,et_file):
+
+def add_eytracker_triggers(raw, et_file):
     """
     :string et_file: the path to eye tracker file
     raw: the raw file which the ET file matches
@@ -633,10 +681,13 @@ def add_eytracker_triggers(raw,et_file):
     plt.plot(np.in1d(np.arange(len(raw.get_data(1)[0])), blink_times), linewidth=.7)  # blink triggers
     plt.show()
     # %% add triggers to data
-    saccade_times = np.sort(np.concatenate([saccade_times, saccade_times + 1, saccade_times + 2, saccade_times + 3]))  # make them longer
-    blink_times = np.sort(np.concatenate([blink_times, blink_times + 1, blink_times + 2, blink_times + 3]))  # make them longer
+    saccade_times = np.sort(
+        np.concatenate([saccade_times, saccade_times + 1, saccade_times + 2, saccade_times + 3]))  # make them longer
+    blink_times = np.sort(
+        np.concatenate([blink_times, blink_times + 1, blink_times + 2, blink_times + 3]))  # make them longer
     fixation_times = np.sort(
-        np.concatenate([fixation_times, fixation_times + 1, fixation_times + 2,fixation_times + 3]))  # make them longer
+        np.concatenate(
+            [fixation_times, fixation_times + 1, fixation_times + 2, fixation_times + 3]))  # make them longer
     raw._data[raw.ch_names.index("Status")][blink_times.astype(np.int)] = 99  # set blinks
     raw._data[raw.ch_names.index("Status")][saccade_times.astype(np.int)] = 98  # set saccades
     raw._data[raw.ch_names.index("Status")][fixation_times.astype(np.int)] = 97  # set fixations
