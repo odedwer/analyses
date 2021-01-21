@@ -282,7 +282,7 @@ def annotate_breaks(raw, trig=254, samp_rate=2048):
 
 
 def fixation_saccade_variance_ratio(raw, ica, events, cut_before_event=10 / 1000, cut_after_event_sac=50 / 1000,
-                                    cut_after_event_fix=350 / 1000,et_trig_dict={'blink': 99, 'saccade': 98, 'fixation': 97}):
+                                    cut_after_event_fix=350 / 1000, et_trig_dict={'blink': 99, 'saccade': 98, 'fixation': 97}):
     """
     Create the projected ica sources and epoch them by saccades and fixation.
     calculate the overall variance of both epochs for each component and plot their ratio, with a line marking 1.1
@@ -316,8 +316,10 @@ def fixation_saccade_variance_ratio(raw, ica, events, cut_before_event=10 / 1000
     print("Shape of saccade data:", data_sac.shape)
     raw_sac = mne.io.RawArray(data_sac, source_raw.info)
 
-    fixation_var = np.var(data_fix,axis=1)
-    saccade_var = np.var(data_sac,axis=1)
+    outlier_fix = np.quantile(np.abs(data_fix),0.98)
+    outlier_sac = np.quantile(np.abs(data_fix),0.98)
+    fixation_var = stats.tvar(data_fix,(-outlier_fix,outlier_fix),axis=1)
+    saccade_var = stats.tvar(data_sac,(-outlier_sac,outlier_sac),axis=1)
 
     var_ratio = saccade_var/fixation_var
     plt.bar(x=source_raw.ch_names, height=var_ratio, color="darkblue")
@@ -429,11 +431,17 @@ def plot_ica_component(raw, ica, events, event_dict, stimuli, comp_start):
             self.ax[1, 1].set_ylabel('μV')
             self.ax[1, 1].set_ylim(-2, 2)
 
-            correls = [np.corrcoef(data_ica, raw._data[i])[0, 1] for i in range(len(self.raw.ch_names))]
-            self.ax[1, 0].bar(x=raw.ch_names, height=correls, color='purple')
-            self.ax[1, 0].set_title('Electrode correlation)')
-            self.ax[1, 0].set_ylabel('r')
-
+            #correls = [np.corrcoef(data_ica, raw._data[i])[0, 1] for i in range(len(self.raw.ch_names))]
+            # self.ax[1, 0].bar(x=raw.ch_names, height=correls, color='purple')
+            # self.ax[1, 0].set_title('Electrode correlation)')
+            # self.ax[1, 0].set_ylabel('r')
+            evoked_stimulus = epochs_ica[list(event_dict.keys())[2:]].average(0).data
+            self.ax[1, 0].plot((np.arange(len(evoked_stimulus[0, :])) / evoked.info['sfreq'] - 0.4),
+                               evoked_stimulus[0, :])
+            self.ax[1, 0].axhline(0, linestyle="--", color="grey", linewidth=.6)
+            self.ax[1, 0].set_title('Stimulus ERP')
+            self.ax[1, 0].set_ylabel('μV')
+            self.ax[1, 0].set_ylim(-3, 3)
             # TF
             power_saccade = tfr_morlet(epochs_ica['saccade'], freqs=freqs, average=False,
                                        n_cycles=np.round(np.log((freqs + 13) / 10) * 10), use_fft=True,
@@ -692,3 +700,45 @@ def add_eytracker_triggers(raw, et_file):
     raw._data[raw.ch_names.index("Status")][saccade_times.astype(np.int)] = 98  # set saccades
     raw._data[raw.ch_names.index("Status")][fixation_times.astype(np.int)] = 97  # set fixations
     return (raw)
+
+def ttest_on_epochs(epochs,channel, alpha=0.05,title="epochs"):
+    """
+    gets on epoch and conducts 1 sample t-test for a specific electrode to test the hypothesis the mean is higher from zero
+    :param epochs: the epochs file to be tested
+    :param channel: wanted electrode, str
+    :param alpha: significance level, float
+    :return: plots the t by time for the elctrode and returns the times in which t is significant
+    """
+
+    from mne.stats import bonferroni_correction, fdr_correction
+    X = epochs.get_data()  # as 3D matrix
+    X = X[:, epochs.ch_names.index(channel), :]  # take only one channel to get a 2D array
+    T, pval = stats.ttest_1samp(X, 0)
+
+    n_samples, n_tests = X.shape
+    threshold_uncorrected = stats.t.ppf(1.0 - alpha, n_samples - 1)
+
+    reject_bonferroni, pval_bonferroni = bonferroni_correction(pval, alpha=alpha)
+    threshold_bonferroni = stats.t.ppf(1.0 - alpha / n_tests, n_samples - 1)
+
+    reject_fdr, pval_fdr = fdr_correction(pval, alpha=alpha, method='indep')
+    threshold_fdr = np.min(np.abs(T)[reject_fdr])
+    times = 1e3 * epochs.times
+
+    plt.close('all')
+    plt.plot(times, T, 'k', label='T-stat')
+    plt.title(title)
+    xmin, xmax = plt.xlim()
+    plt.hlines(threshold_uncorrected, xmin, xmax, linestyle='--', colors='k',
+               label='p=0.05 (uncorrected)', linewidth=2)
+    plt.hlines(threshold_bonferroni, xmin, xmax, linestyle='--', colors='r',
+               label='p=0.05 (Bonferroni)', linewidth=2)
+    plt.hlines(threshold_fdr, xmin, xmax, linestyle='--', colors='b',
+               label='p=0.05 (FDR)', linewidth=2)
+    plt.legend()
+    plt.xlabel("Time (ms)")
+    plt.ylabel("T-stat")
+    plt.show()
+    return({"fdr":times[T>threshold_fdr],
+            "uncorrected":times[T>threshold_uncorrected]})
+

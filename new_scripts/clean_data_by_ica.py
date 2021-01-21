@@ -60,6 +60,7 @@ SUBJECT_NUMBER_IDX = 1
 MODALIDY_IDX = 2
 HIGH_PASS_IDX = 3
 
+
 # %% read data
 subject_num = get_subject_number()
 modality = get_modality()
@@ -75,33 +76,49 @@ ica = mne.preprocessing.read_ica(join(save_dir, ica_filename))
 raw_unfiltered.info['bads'] = raw_filtered.info['bads']
 raw_unfiltered._annotations = raw_filtered._annotations
 
+# %% variance ratio
+events = mne.find_events(raw_filtered, stim_channel="Status", mask=255, min_duration= 2/ raw_filtered.info['sfreq'])
+ratios = fixation_saccade_variance_ratio(raw_filtered,ica,events)
+
 # %% inspect
 ica.plot_sources(raw_filtered)
+
 stimuli = ['short_scrambled', 'long_scrambled', 'short_face', 'long_face',
            'short_obj', 'long_obj', 'short_body', 'long_body']
 if modality == 'auditory':
     stimuli = ['long_word', 'short_word']
 comp_start = 0  # from which component to start showing
-events = mne.find_events(raw_filtered, stim_channel="Status", mask=255, min_duration=2 / raw.info['sfreq'])
+
+epochs_filt = mne.Epochs(raw_filtered, events, event_id=TRIG_DICT,
+                    tmin=-0.4, tmax=1.9, baseline=(-0.25, -0.1),
+                    reject_tmin=-.1, reject_tmax=1.5,  # reject based on 100 ms before trial onset and 1500 after
+                    preload=True, reject_by_annotation=True)
+# for i in range(len(ica._ica_names)):
+#     ica.plot_properties(epochs_filt, picks=i)
+#     input(f"press enter to continue to component {i+1}")
+ica.plot_components()
 ica.exclude = plot_ica_component(raw_filtered, ica, events, dict(**TRIG_DICT, **ET_TRIG_DICT), stimuli, comp_start)
 
 # %% apply solution and epoch for ERPs
 ica.apply(raw_unfiltered)
 raw_filt = raw_unfiltered.copy().filter(l_freq=1, h_freq=30)  # performing filtering on copy of raw data, not on raw itself or epochs
 raw_filt.notch_filter([50, 100, 150])  # notch filter
-epochs_filt = mne.Epochs(raw_filt, events, event_id=TRIG_DICT,
+events = mne.find_events(raw_unfiltered, stim_channel="Status", mask=255, min_duration= 2/ raw_unfiltered.info['sfreq'])
+
+epochs_filt_clean = mne.Epochs(raw_filt, events, event_id=TRIG_DICT,
                     tmin=-0.4, tmax=1.9, baseline=(-0.25, -0.1),
                     reject_tmin=-.1, reject_tmax=1.5,  # reject based on 100 ms before trial onset and 1500 after
                     preload=True, reject_by_annotation=True)
-threshold = autoreject.get_rejection_threshold(epochs_filt)
+threshold = autoreject.get_rejection_threshold(epochs_filt_clean)
 threshold['eeg'] *= 2
-n_trials = len(epochs)
-epochs_filt.drop_bad(reject=threshold)
-print(f"removed {n_trials - len(epochs_filt)} trials by peak to peak rejection with threshold {threshold['eeg']}")
-epochs_filt.plot()
+threshold['eog'] *= 3
+n_trials = len(epochs_filt_clean)
+epochs_filt_clean.drop_bad(reject=threshold)
+print(f"removed {n_trials - len(epochs_filt_clean)} trials by peak to peak rejection with threshold {np.round(threshold['eeg'],5)} V on eeg and {np.round(threshold['eog'],5)} V on eog")
+epochs_filt_clean.plot()
 
 # %% save
 exclusions = pd.DataFrame({"excluded": ica.exclude})
 exclusions.to_csv(f"sub-{subject_num}_task-{modality}-{low_cutoff_freq:.2f}hpf-overweighted-ica-rejected.csv")
-epochs_filt.save(f"sub-{subject_num}_task-{modality}-1-30-bp-epo.fif")
+epochs_filt_clean.save(f"sub-{subject_num}_task-{modality}-1-30-bp-epo.fif")
 raw_unfiltered.save(f"sub-{subject_num}_task-{modality}-unfiltered-clean-raw.fif")
