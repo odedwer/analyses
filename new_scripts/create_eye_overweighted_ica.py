@@ -5,7 +5,7 @@ from os.path import join
 import matplotlib
 matplotlib.use('Qt5Agg')
 from preprocess_utilities import *
-# %% functions
+# functions
 def read_bdf_files(preload=True):
     """
     :return: List of the raw objects (preloaded)
@@ -41,8 +41,8 @@ def get_modality():
 
 # %% params and functions
 MODALITY_ERR_MSG = "You did not enter a correct modality. Please attempt again:"
-VALID_MODALITIES = ['visual', 'auditory']
-MODALITY_MSG = "Please enter the modality (auditory/visual): "
+VALID_MODALITIES = ['visual', 'auditory_w', 'auditory_b']
+MODALITY_MSG = "Please enter the modality (auditory_w/auditory_b/visual): "
 HPF_MSG = "Please enter the higphass filter cutoff: "
 SUBJECT_MSG = "Please enter the subject number: "
 BASE_DATA_DIR = "S:\Lab-Shared\Experiments\HighDenseGamma\data"
@@ -50,7 +50,7 @@ TRIG_DICT = {'short_body':11, 'long_body':13,
              'short_face':21,'long_face':23,
              'short_place':31,'long_place':33,
              'short_pattern':41,'long_pattern':43,
-             'short_object':51,'long_object':53,}
+             'short_object':51,'long_object':53}
 ET_TRIG_DICT = {'blink': 99, 'saccade': 98, 'fixation': 97}
 OVERWEIGHT = 5  # How many times to overweight saccades
 SUBJECT_NUMBER_IDX = 1
@@ -65,7 +65,8 @@ save_dir = join(BASE_DATA_DIR, f"sub-{subject_num}", "eeg", modality)
 et_filename = f"sub-{subject_num}_task-{modality}-et.asc"
 filename = f"sub-{subject_num}_task-{modality}-{low_cutoff_freq:.2f}hpf-rejections-raw.fif"
 raw = mne.io.read_raw_fif(join(save_dir, filename), preload=True)
-
+if(modality!="visual"):
+    TRIG_DICT = {"short_word":12,"long_word":22}
 # %% add eye tracker triggers
 raw = add_eytracker_triggers(raw, join(save_dir, et_filename))
 

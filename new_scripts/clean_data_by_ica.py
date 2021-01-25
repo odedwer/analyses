@@ -44,7 +44,7 @@ def get_modality():
 
 # %% params
 MODALITY_ERR_MSG = "You did not enter a correct modality. Please attempt again:"
-VALID_MODALITIES = ['visual', 'auditory']
+VALID_MODALITIES = ['visual', 'auditory_w', 'auditory_b']
 MODALITY_MSG = "Please enter the modality (auditory/visual): "
 HPF_MSG = "Please enter the higphass filter cutoff: "
 SUBJECT_MSG = "Please enter the subject number: "
@@ -62,8 +62,11 @@ HIGH_PASS_IDX = 3
 
 
 # %% read data
-subject_num = get_subject_number()
+subject_num = input("subject number?")
 modality = get_modality()
+if(modality!="visual"):
+    TRIG_DICT = {"short_word":12,"long_word":22}
+
 low_cutoff_freq = get_highpass_cutoff()
 save_dir = join(BASE_DATA_DIR, f"sub-{subject_num}", "eeg", modality)
 ica_filename = f"sub-{subject_num}_task-{modality}-{low_cutoff_freq:.2f}hpf-overweighted-ica.fif"
@@ -97,7 +100,7 @@ epochs_filt = mne.Epochs(raw_filtered, events, event_id=TRIG_DICT,
 #     ica.plot_properties(epochs_filt, picks=i)
 #     input(f"press enter to continue to component {i+1}")
 ica.plot_components()
-ica.exclude = plot_ica_component(raw_filtered, ica, events, dict(**TRIG_DICT, **ET_TRIG_DICT), stimuli, comp_start)
+# ica.exclude = plot_ica_component(raw_filtered, ica, events, dict(**TRIG_DICT, **ET_TRIG_DICT), stimuli, comp_start)
 
 # %% apply solution and epoch for ERPs
 ica.apply(raw_unfiltered)
@@ -119,6 +122,6 @@ epochs_filt_clean.plot()
 
 # %% save
 exclusions = pd.DataFrame({"excluded": ica.exclude})
-exclusions.to_csv(f"sub-{subject_num}_task-{modality}-{low_cutoff_freq:.2f}hpf-overweighted-ica-rejected.csv")
-epochs_filt_clean.save(f"sub-{subject_num}_task-{modality}-1-30-bp-epo.fif")
-raw_unfiltered.save(f"sub-{subject_num}_task-{modality}-unfiltered-clean-raw.fif")
+exclusions.to_csv(join(save_dir,f"sub-{subject_num}_task-{modality}-{low_cutoff_freq:.2f}hpf-overweighted-ica-rejected.csv"))
+epochs_filt_clean.save(join(save_dir,f"sub-{subject_num}_task-{modality}-1-30-bp-epo.fif"))
+raw_unfiltered.save(join(save_dir,f"sub-{subject_num}_task-{modality}-unfiltered-clean-raw.fif"))

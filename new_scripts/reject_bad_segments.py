@@ -80,7 +80,7 @@ MODALIDY_IDX = 2
 HIGH_PASS_IDX = 3
 
 # %%get inputs
-subject_num = get_subject_number()
+subject_num = input("subject num?")
 # %%
 modality = get_modality()
 # %%
@@ -109,7 +109,7 @@ copy_raw = raw.copy()  # make a copy before adding the new channel
 # raw_eeg = raw.copy().pick_types(meg=False, eeg=True, exclude=[])
 # raw_eeg = raw_eeg.interpolate_bads(mode='fast', verbose=True)
 # raw._data[0:256] = raw_eeg._data[0:256] #replace with interpolated data
-raw = raw.interpolate_bads(mode='fast', verbose=True)
+raw = raw.interpolate_bads(mode='accurate', verbose=True)
 raw.set_eeg_reference()
 
 subject_string = f"sub-{subject_num}"

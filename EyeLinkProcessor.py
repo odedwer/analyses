@@ -493,7 +493,7 @@ class EyeLinkProcessor:
 
         # Generate EEG event time course
         eeg_data_trig_ch = np.squeeze((raw['Status'])[0])
-        eeg_data_trigs = find_events(raw, mask=255, mask_type="and", min_duration=1/raw.info['sfreq'])  # read events
+        eeg_data_trigs = find_events(raw, mask=255, mask_type="and", min_duration=2/raw.info['sfreq'])  # read events
         eeg_trigs = np.zeros_like(eeg_data_trig_ch, dtype=np.int)
         eeg_trigs[eeg_data_trigs[:, 0]] = eeg_data_trigs[:, 2]  # transform events into eeg_data long vector
         # transform et events into et_num_samples long vector
