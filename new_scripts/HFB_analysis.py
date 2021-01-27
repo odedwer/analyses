@@ -95,7 +95,7 @@ epochs = mne.Epochs(raw_unfiltered, events, event_id=TRIG_DICT,
                     tmin=-0.4, tmax=1.9, baseline=(-0.25, -0.1),
                     reject_tmin=-.1, reject_tmax=1.5,  # reject based on 100 ms before trial onset and 1500 after
                     preload=True, reject_by_annotation=True)
-epochs.plot_image(picks=['B30'])
+epochs.plot_image(picks=['A1'])
 
 #%% TFR plots
 power_long_H = tfr_morlet(epochs[stimuli[1::2]], freqs=freqsH, average=False,
@@ -108,12 +108,12 @@ power_short_H = tfr_morlet(epochs[stimuli[::2]], freqs=freqsH, average=False,
                            return_itc=False, decim=3, n_jobs=12)
 power_short_H = power_short_H.average()
 
-power_long_L = tfr_morlet(epochs[1::2], freqs=freqsL, average=False,
+power_long_L = tfr_morlet(epochs[stimuli[1::2]], freqs=freqsL, average=False,
                           n_cycles=freqsL / 5, use_fft=True,
                           return_itc=False, decim=3, n_jobs=12)
 power_long_L = power_long_L.average()
 
-power_short_L = tfr_morlet(epochs[::2], freqs=freqsL, average=False,
+power_short_L = tfr_morlet(epochs[stimuli[::2]], freqs=freqsL, average=False,
                            n_cycles=freqsL / 5, use_fft=True,
                            return_itc=False, decim=3, n_jobs=12)
 power_short_L = power_short_L.average()
@@ -127,7 +127,7 @@ curr_TFR.plot_topo(baseline=base_correction, mode=correction_mode, title=power_n
 # %% show ERP after hilbert
 ## filter raw data using iir butterwoth filter of order 3
 raw_hilb = []
-bands = [(51,71), (71,91), (91,111),(111,131)]
+bands = [(58,78),(78,98),(102,122)]
 nbands = len(bands)  # starting from 50, jumping by 20
 for i in range(nbands):
     curr_l_freq = bands[i][0]
@@ -142,7 +142,7 @@ for i in range(nbands):
     input()
 
 ##  compute mean of all filter bands
-raw_hilb[0]._data = (raw_hilb[0]._data + raw_hilb[1]._data + raw_hilb[2]._data +raw_hilb[3]._data) / nbands
+raw_hilb[0]._data = (raw_hilb[0]._data + raw_hilb[1]._data + raw_hilb[2]._data) / nbands
 #raw_hilb[0].filter(l_freq=1,h_freq=30) # should I?
 
 #%% epoch and compute duration tracking scores
@@ -152,15 +152,18 @@ epochs_hilb = mne.Epochs(raw_hilb[0], events, event_id=TRIG_DICT,
                          preload=True, reject_by_annotation=True)
 epochs_hilb.apply_baseline((-.3, -.05), verbose=True)
 epochs_hilb._data /= 1e-06 # for scale
-epochs_HFB_L = epochs_hilb['short_word'] #['long_body','long_face','long_place','long_object','long_pattern']
-epochs_HFB_S = epochs_hilb['long_word'] #['short_body','short_face','short_place','short_object','short_pattern']
+epochs_HFB_S = epochs_hilb['short_word'] #['long_body','long_face','long_place','long_object','long_pattern']
+epochs_HFB_L = epochs_hilb['long_word'] #['short_body','short_face','short_place','short_object','short_pattern']
 evokedHFB_L = epochs_HFB_L.average()
 evokedHFB_S = epochs_HFB_S.average()
 
 # %%
 dt_scores = duration_tracking(epochs_HFB_L,epochs_HFB_S,
-                              time_diff=[time_end_short+.2,time_end_long+.1])
+                              time_diff=[time_end_short+.3,time_end_long+.1])
+onset_resp_score = [total_onset_power(epochs_hilb,ch)[0] for ch in epochs_hilb.ch_names]
 mne.viz.plot_topomap(dt_scores,epochs_hilb.info)
+#%%
+mne.viz.plot_topomap(onset_resp_score,epochs_hilb.info)
 #%%
 electrode = input("Electrode?")
 times_significant_short = ttest_on_epochs(epochs_HFB_S,electrode,title="Short epochs")

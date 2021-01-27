@@ -282,7 +282,8 @@ def annotate_breaks(raw, trig=254, samp_rate=2048):
 
 
 def fixation_saccade_variance_ratio(raw, ica, events, cut_before_event=10 / 1000, cut_after_event_sac=50 / 1000,
-                                    cut_after_event_fix=350 / 1000, et_trig_dict={'blink': 99, 'saccade': 98, 'fixation': 97}):
+                                    cut_after_event_fix=350 / 1000,
+                                    et_trig_dict={'blink': 99, 'saccade': 98, 'fixation': 97}):
     """
     Create the projected ica sources and epoch them by saccades and fixation.
     calculate the overall variance of both epochs for each component and plot their ratio, with a line marking 1.1
@@ -303,10 +304,10 @@ def fixation_saccade_variance_ratio(raw, ica, events, cut_before_event=10 / 1000
                                 reject_tmin=-cut_before_event, reject_tmax=cut_after_event_sac,
                                 preload=True, reject_by_annotation=True)
     epochs_fixation = mne.Epochs(source_raw, events, event_id=et_trig_dict["fixation"],
-                                tmin=-cut_before_event, tmax=cut_after_event_fix,
-                                baseline=(-cut_before_event, cut_after_event_fix),
-                                reject_tmin=-cut_before_event, reject_tmax=cut_after_event_fix,
-                                preload=True, reject_by_annotation=True)
+                                 tmin=-cut_before_event, tmax=cut_after_event_fix,
+                                 baseline=(-cut_before_event, cut_after_event_fix),
+                                 reject_tmin=-cut_before_event, reject_tmax=cut_after_event_fix,
+                                 preload=True, reject_by_annotation=True)
 
     data_fix = np.hstack(epochs_fixation.get_data())
     print("Shape of fixtation data:", data_fix.shape)
@@ -316,12 +317,12 @@ def fixation_saccade_variance_ratio(raw, ica, events, cut_before_event=10 / 1000
     print("Shape of saccade data:", data_sac.shape)
     raw_sac = mne.io.RawArray(data_sac, source_raw.info)
 
-    outlier_fix = np.quantile(np.abs(data_fix),0.98)
-    outlier_sac = np.quantile(np.abs(data_fix),0.98)
-    fixation_var = stats.tvar(data_fix,(-outlier_fix,outlier_fix),axis=1)
-    saccade_var = stats.tvar(data_sac,(-outlier_sac,outlier_sac),axis=1)
+    outlier_fix = np.quantile(np.abs(data_fix), 0.98)
+    outlier_sac = np.quantile(np.abs(data_fix), 0.98)
+    fixation_var = stats.tvar(data_fix, (-outlier_fix, outlier_fix), axis=1)
+    saccade_var = stats.tvar(data_sac, (-outlier_sac, outlier_sac), axis=1)
 
-    var_ratio = saccade_var/fixation_var
+    var_ratio = saccade_var / fixation_var
     plt.bar(x=source_raw.ch_names, height=var_ratio, color="darkblue")
     plt.axhline(y=1.1, color='red')
     plt.ylabel("Variance ratio fix/sac")
@@ -329,7 +330,8 @@ def fixation_saccade_variance_ratio(raw, ica, events, cut_before_event=10 / 1000
     plt.show()
     raw_fix.plot(title="fixation epochs")
     raw_sac.plot(title="saccade epochs")
-    return dict(zip(source_raw.ch_names,var_ratio))
+    return dict(zip(source_raw.ch_names, var_ratio))
+
 
 def plot_ica_component(raw, ica, events, event_dict, stimuli, comp_start):
     """
@@ -431,7 +433,7 @@ def plot_ica_component(raw, ica, events, event_dict, stimuli, comp_start):
             self.ax[1, 1].set_ylabel('μV')
             self.ax[1, 1].set_ylim(-2, 2)
 
-            #correls = [np.corrcoef(data_ica, raw._data[i])[0, 1] for i in range(len(self.raw.ch_names))]
+            # correls = [np.corrcoef(data_ica, raw._data[i])[0, 1] for i in range(len(self.raw.ch_names))]
             # self.ax[1, 0].bar(x=raw.ch_names, height=correls, color='purple')
             # self.ax[1, 0].set_title('Electrode correlation)')
             # self.ax[1, 0].set_ylabel('r')
@@ -618,7 +620,8 @@ def multiply_event(raw, event_dict, events, saccade_id=98,
                                  baseline=(-cut_before_event, cut_after_event),
                                  reject_tmin=-cut_before_event, reject_tmax=cut_after_event,
                                  # reject based on 100 ms before trial onset and 1500 after
-                                 preload=True, reject_by_annotation=True)  # currently includes mean-centering - should we?
+                                 preload=True,
+                                 reject_by_annotation=True)  # currently includes mean-centering - should we?
     epochs_saccades.plot()
     data_s = np.hstack(epochs_saccades.get_data())
     data_s = np.hstack([data_s.copy() for _ in range(size_new)])
@@ -701,7 +704,8 @@ def add_eytracker_triggers(raw, et_file):
     raw._data[raw.ch_names.index("Status")][fixation_times.astype(np.int)] = 97  # set fixations
     return (raw)
 
-def ttest_on_epochs(epochs,channel, alpha=0.05,title="epochs"):
+
+def ttest_on_epochs(epochs, channel, alpha=0.05, title="epochs", toplot=True):
     """
     gets on epoch and conducts 1 sample t-test for a specific electrode to test the hypothesis the mean is higher from zero
     :param epochs: the epochs file to be tested
@@ -725,20 +729,45 @@ def ttest_on_epochs(epochs,channel, alpha=0.05,title="epochs"):
     threshold_fdr = np.min(np.abs(T)[reject_fdr])
     times = 1e3 * epochs.times
 
-    plt.close('all')
-    plt.plot(times, T, 'k', label='T-stat')
-    plt.title(title)
-    xmin, xmax = plt.xlim()
-    plt.hlines(threshold_uncorrected, xmin, xmax, linestyle='--', colors='k',
-               label='p=0.05 (uncorrected)', linewidth=2)
-    plt.hlines(threshold_bonferroni, xmin, xmax, linestyle='--', colors='r',
-               label='p=0.05 (Bonferroni)', linewidth=2)
-    plt.hlines(threshold_fdr, xmin, xmax, linestyle='--', colors='b',
-               label='p=0.05 (FDR)', linewidth=2)
-    plt.legend()
-    plt.xlabel("Time (ms)")
-    plt.ylabel("T-stat")
-    plt.show()
-    return({"fdr":times[T>threshold_fdr],
-            "uncorrected":times[T>threshold_uncorrected]})
+    if (toplot == True):
+        plt.close('all')
+        plt.plot(times, T, 'k', label='T-stat')
+        plt.title(title)
+        xmin, xmax = plt.xlim()
+        plt.hlines(threshold_uncorrected, xmin, xmax, linestyle='--', colors='k',
+                   label='p=0.05 (uncorrected)', linewidth=2)
+        plt.hlines(threshold_bonferroni, xmin, xmax, linestyle='--', colors='r',
+                   label='p=0.05 (Bonferroni)', linewidth=2)
+        plt.hlines(threshold_fdr, xmin, xmax, linestyle='--', colors='b',
+                   label='p=0.05 (FDR)', linewidth=2)
+        plt.legend()
+        plt.xlabel("Time (ms)")
+        plt.ylabel("T-stat")
+        plt.show()
+    return ({"fdr": times[T > threshold_fdr],
+             "uncorrected": times[T > threshold_uncorrected]}, T)
 
+
+def total_onset_power(epochs, channel, time_start=0.1, time_stop=0.5, nperm=2000, cluster_thresh_t=1, alpha=0.05):
+    """
+    An electrode is marked as onset responsive if there is at least 1 significant cluster between 100 to 500 ms.
+    Onset responsiveness score is the average of all t-tests in the response if there is a significant cluster, otherwise zero
+    Gets an epochs of band power (like 60-120) and calculates the average t-score of the time of interest. also returns
+    the p-value of a permutation test of this onset cluster.
+    :param alpha: float. the threshold for significance of a cluster
+    :param epochs: epochs of band power
+    :param time_start: float, time from which to sum t scores
+    :param time_stop: float, time from which to sum t scores
+    :return: average of t score in time of interest, cluster p-values
+    """
+    epochs_perm = epochs.copy()
+    samples_of_int = (epochs_perm.times > time_start) & (
+                epochs_perm.times < time_stop)  # take only the timepoints of interest
+    T_obs, clusters, cluster_p_values, H0 = \
+        mne.stats.permutation_cluster_1samp_test(
+            epochs_perm._data[:, epochs_perm.ch_names.index(channel), samples_of_int],
+            n_permutations=nperm, seed=1,
+            threshold=cluster_thresh_t, tail=1,
+            out_type='mask',verbose='ERROR')
+    responsivnes_score = np.mean(T_obs) * (sum(cluster_p_values < alpha)>0) #send to zero if no significant cluster
+    return responsivnes_score,np.mean(T_obs),cluster_p_values

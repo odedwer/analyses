@@ -8,7 +8,7 @@ import pandas as pd
 import matplotlib
 matplotlib.use('Qt5Agg')
 from preprocess_utilities import *
-# %% functions
+# functions
 def read_bdf_files(preload=True):
     """
     :return: List of the raw objects (preloaded)
