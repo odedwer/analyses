@@ -672,6 +672,25 @@ def duration_tracking(epo_A, epo_B, time_diff, p_thresh=0.01):
 
     return (dt_scores)
 
+def duration_tracking_new(epo_A, epo_B, channel,time_diff, cluster_thresh_t=1,nperm=2000, alpha=0.05):
+    """
+    A channel is defined as duration tracking and gets a score only if there is a signficant cluster between the epochs
+     in the relevant time (end of short to end of long)
+    Calculates duration tracking score by averaging over all point-by point t-test int the relevant time. after deriving t and p-value, get
+    :return:dt_scores - the mean of point by poiny t-tests, p-values of clusters.
+    """
+
+    samples_of_int = (epo_A.times > time_diff[0]) & (epo_A.times < time_diff[1])  # take only the timepoints of interest
+    epochs_perm_A = epo_A._data[:, epo_A.ch_names.index(channel), samples_of_int]
+    epochs_perm_B = epo_B._data[:, epo_B.ch_names.index(channel), samples_of_int]
+    T_obs, clusters, cluster_p_values, H0 = \
+        mne.stats.permutation_cluster_test([epochs_perm_A,epochs_perm_B],
+                                                 n_permutations=nperm, seed=1,
+                                                 threshold=cluster_thresh_t, tail=1,
+                                                 out_type='mask', verbose='ERROR')
+    dt_score = np.mean(T_obs) * (sum(cluster_p_values < alpha) > 0)  # send to zero if no significant cluster
+    return dt_score, np.mean(T_obs), cluster_p_values
+
 
 def add_eytracker_triggers(raw, et_file):
     """

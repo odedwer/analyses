@@ -152,18 +152,22 @@ epochs_hilb = mne.Epochs(raw_hilb[0], events, event_id=TRIG_DICT,
                          preload=True, reject_by_annotation=True)
 epochs_hilb.apply_baseline((-.3, -.05), verbose=True)
 epochs_hilb._data /= 1e-06 # for scale
-epochs_HFB_S = epochs_hilb['short_word'] #['long_body','long_face','long_place','long_object','long_pattern']
-epochs_HFB_L = epochs_hilb['long_word'] #['short_body','short_face','short_place','short_object','short_pattern']
+epochs_HFB_L = epochs_hilb['long_word'] #['long_body','long_face','long_place','long_object','long_pattern'] #
+epochs_HFB_S = epochs_hilb ['short_word'] #['short_body','short_face','short_place','short_object','short_pattern'] ##
 evokedHFB_L = epochs_HFB_L.average()
 evokedHFB_S = epochs_HFB_S.average()
 
 # %%
-dt_scores = duration_tracking(epochs_HFB_L,epochs_HFB_S,
-                              time_diff=[time_end_short+.3,time_end_long+.1])
-onset_resp_score = [total_onset_power(epochs_hilb,ch)[0] for ch in epochs_hilb.ch_names]
+dt_scores = [duration_tracking_new(epochs_HFB_L,epochs_HFB_S,ch,time_diff=[time_end_short+.1,time_end_long+.1])[0]
+             for ch in epochs_hilb.ch_names[:-9]]; print("Done with duration tracking")
+onset_resp_score = [total_onset_power(epochs_hilb,ch)[0] for ch in epochs_hilb.ch_names[:-9]]
+# %%
 mne.viz.plot_topomap(dt_scores,epochs_hilb.info)
 #%%
-mne.viz.plot_topomap(onset_resp_score,epochs_hilb.info)
+mne.viz.plot_topomap(onset_resp_score,epochs_hilb.info,cmap='Blues')
+#%%
+mne.viz.plot_topomap(np.array(onset_resp_score)*np.array(dt_scores),epochs_hilb.info,cmap='Greens')
+
 #%%
 electrode = input("Electrode?")
 times_significant_short = ttest_on_epochs(epochs_HFB_S,electrode,title="Short epochs")
@@ -181,12 +185,14 @@ mne.viz.plot_compare_evokeds({"Long":evokedHFB_L,"Short":evokedHFB_S},electrode,
                              title="Long and short HFB",vlines=[time_end_short,time_end_long])
 
 #%% save
-epochs_HFB_L.save(join(save_dir,f"sub-{subject_num}_task-{modality}-long-51-131-hfb-20bands-epo.fif"))
-epochs_HFB_S.save(join(save_dir,f"sub-{subject_num}_task-{modality}-short-51-131-hfb-20bands-epo.fif"))
+epochs_HFB_L.save(join(save_dir,f"sub-{subject_num}_task-{modality}-long-58-122-hfb-epo.fif"),overwrite=True)
+epochs_HFB_S.save(join(save_dir,f"sub-{subject_num}_task-{modality}-short-58-122-hfb-epo.fif"),overwrite=True)
 dt_score_df = pd.DataFrame({"electrode": raw_unfiltered.ch_names[0:len(dt_scores)],"dt_score":dt_scores})
-dt_score_df.to_csv(join(save_dir,f"sub-{subject_num}_task-{modality}-duration_tracking-51-131-hfb-20bands.csv"))
-power_short_L.save(join(save_dir,f"sub-{subject_num}_task-{modality}-short_low_freqs-tfr.fif"))
-power_short_H.save(join(save_dir,f"sub-{subject_num}_task-{modality}-short_high_freqs-tfr.fif"))
-power_long_L.save(join(save_dir,f"sub-{subject_num}_task-{modality}-long_low_freqs-tfr.fif"))
-power_long_H.save(join(save_dir,f"sub-{subject_num}_task-{modality}-long_high_freqs-tfr.fif"))
+dt_score_df.to_csv(join(save_dir,f"sub-{subject_num}_task-{modality}-duration_tracking-58-122-hfb.csv"))
+onset_resp_df = pd.DataFrame({"electrode": raw_unfiltered.ch_names[0:len(onset_resp_score)],"onset_resp":onset_resp_score})
+onset_resp_df.to_csv(join(save_dir,f"sub-{subject_num}_task-{modality}-onset_resp-58-122-hfb.csv"))
+power_short_L.save(join(save_dir,f"sub-{subject_num}_task-{modality}-short_low_freqs-tfr.fif"),overwrite=True)
+power_short_H.save(join(save_dir,f"sub-{subject_num}_task-{modality}-short_high_freqs-tfr.fif"),overwrite=True)
+power_long_L.save(join(save_dir,f"sub-{subject_num}_task-{modality}-long_low_freqs-tfr.fif"),overwrite=True)
+power_long_H.save(join(save_dir,f"sub-{subject_num}_task-{modality}-long_high_freqs-tfr.fif"),overwrite=True)
 
