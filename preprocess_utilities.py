@@ -12,7 +12,6 @@ import seaborn as sn
 from h5py import File
 from pandas import DataFrame
 from scipy import stats
-
 from EyeLinkProcessor import EyeLinkProcessor
 from ParserType import ParserType
 from SaccadeDetectorType import SaccadeDetectorType
@@ -42,22 +41,34 @@ def load_data(filename):
 
 
 #
-# def read_bdf_files(preload=True): """ Reads bdf file from disk. If there
-# are several files, reads them all to different raw objects. GUI will open
-# to choose a file from a folder. Any file in that folder that has the same
-# name of the chosen file up to the last _ in the filename will be added
-# opened as a raw object, by order of names (lexicographic) :return: List of
-# the raw objects (preloaded) """ # don't concatenate, return list # get file
-# path using GUI Tk().withdraw() filename = askopenfilename(title="Please
-# choose ") filenames = [] dir_path = os.path.dirname(filename) just_filename
-# = os.path.basename(filename) count = 0 for cur_filename in os.listdir(
-# dir_path): if just_filename[:just_filename.rfind('_')] == cur_filename[
-# :cur_filename.rfind('_')] and cur_filename[ -3:] == "bdf":
-# filenames.append(cur_filename) count += 1 print("Found", count,
-# " BDF files.") # open file as RAW object, preload data into memory ret = []
-# for file_name in sorted(filenames): if ret is not None: ret.append(
-# mne.io.read_raw_bdf(os.path.join(dir_path, file_name), preload=preload))
-# return ret
+# def read_bdf_files(preload=True):
+#     """
+#     Reads bdf file from disk. If there are several files, reads them all to different raw objects.
+#     GUI will open to choose a file from a folder. Any file in that folder that has the same name of the
+#     chosen file up to the last _ in the filename will be added opened as a raw object, by
+#     order of names (lexicographic)
+#     :return: List of the raw objects (preloaded)
+#     """
+#     # don't concatenate, return list
+#     # get file path using GUI
+#     Tk().withdraw()
+#     filename = askopenfilename(title="Please choose ")
+#     filenames = []
+#     dir_path = os.path.dirname(filename)
+#     just_filename = os.path.basename(filename)
+#     count = 0
+#     for cur_filename in os.listdir(dir_path):
+#         if just_filename[:just_filename.rfind('_')] == cur_filename[:cur_filename.rfind('_')] and cur_filename[
+#                                                                                                   -3:] == "bdf":
+#             filenames.append(cur_filename)
+#             count += 1
+#     print("Found", count, " BDF files.")
+#     # open file as RAW object, preload data into memory
+#     ret = []
+#     for file_name in sorted(filenames):
+#         if ret is not None:
+#             ret.append(mne.io.read_raw_bdf(os.path.join(dir_path, file_name), preload=preload))
+#     return ret
 
 
 def set_reg_eog(raw, add_channels=None) -> mne.io.Raw:
@@ -355,7 +366,6 @@ def fixation_saccade_variance_ratio(raw, ica, events,
     raw_sac.plot(title="saccade epochs")
     return dict(zip(source_raw.ch_names, var_ratio))
 
-
 def plot_ica_component(raw, ica, events, event_dict, stimuli, comp_start):
     """
     plot a component -
@@ -366,7 +376,13 @@ def plot_ica_component(raw, ica, events, event_dict, stimuli, comp_start):
     Time course of the component (and option to zoom in and out)
     Component spectrum (psd)
 
+    :param saccade_times: vector in the length of eeg signal with 1 on each place of saccade onset
+    :param blink_times: vector in the length of eeg signal with 1 on each place of blink onset
+    :param raw: raw object
+    :param ica: saved ica object
+    :return:
     """
+    import matplotlib
     # matplotlib.use('TkAgg', warn=False, force=True)
     import matplotlib.pyplot as plt
     import numpy as np
@@ -411,7 +427,7 @@ def plot_ica_component(raw, ica, events, event_dict, stimuli, comp_start):
                                            command=self.move_up)
             self.button_switch_up.pack(side=RIGHT)
             self.button_switch_down = Button(self.master, text="<-",
-                                             command=self.move_down)
+                                     command=self.move_down)
             self.button_switch_down.pack(side=LEFT)
 
         def draw_graph(self, index):
@@ -737,6 +753,25 @@ def duration_tracking(epo_A, epo_B, time_diff, p_thresh=0.01) -> np.array:
 
     return dt_scores
 
+def duration_tracking_new(epo_A, epo_B, channel,time_diff, cluster_thresh_t=1,nperm=2000, alpha=0.05):
+    """
+    A channel is defined as duration tracking and gets a score only if there is a signficant cluster between the epochs
+     in the relevant time (end of short to end of long)
+    Calculates duration tracking score by averaging over all point-by point t-test int the relevant time. after deriving t and p-value, get
+    :return:dt_scores - the mean of point by poiny t-tests, p-values of clusters.
+    """
+
+    samples_of_int = (epo_A.times > time_diff[0]) & (epo_A.times < time_diff[1])  # take only the timepoints of interest
+    epochs_perm_A = epo_A._data[:, epo_A.ch_names.index(channel), samples_of_int]
+    epochs_perm_B = epo_B._data[:, epo_B.ch_names.index(channel), samples_of_int]
+    T_obs, clusters, cluster_p_values, H0 = \
+        mne.stats.permutation_cluster_test([epochs_perm_A,epochs_perm_B],
+                                                 n_permutations=nperm, seed=1,
+                                                 threshold=cluster_thresh_t, tail=1,
+                                                 out_type='mask', verbose='ERROR')
+    dt_score = np.mean(T_obs) * (sum(cluster_p_values < alpha) > 0)  # send to zero if no significant cluster
+    return dt_score, np.mean(T_obs), cluster_p_values
+
 
 def add_eytracker_triggers(raw: mne.io.Raw, et_file) -> mne.io.Raw:
     """
@@ -778,8 +813,7 @@ def add_eytracker_triggers(raw: mne.io.Raw, et_file) -> mne.io.Raw:
         fixation_times.astype(np.int)] = 97  # set fixations
     return raw
 
-
-def ttest_on_epochs(epochs, channel, alpha=0.05, title="epochs") -> dict:
+def ttest_on_epochs(epochs,channel, alpha=0.05,title="epochs"):
     """
     gets on epoch and conducts 1 sample t-test for a specific electrode to test the hypothesis the mean is higher from zero
     :param epochs: the epochs file to be tested
