@@ -70,10 +70,11 @@ MODALITY_MSG = "Please enter the modality (auditory_w/auditory_b/visual): "
 HPF_MSG = "Please enter the higphass filter cutoff:"
 SUBJECT_MSG = "Please enter the subject number:"
 BASE_DATA_DIR = "S:\Lab-Shared\Experiments\HighDenseGamma\data"
-TRIG_DICT = {'short_scrambled': 110, 'long_scrambled': 112,
-             'short_face': 120, 'long_face': 122,
-             'short_obj': 130, 'long_obj': 132,
-             'short_body': 140, 'long_body': 142}
+TRIG_DICT = {'short_body':11, 'long_body':13,
+             'short_face':21,'long_face':23,
+             'short_place':31,'long_place':33,
+             'short_pattern':41,'long_pattern':43,
+             'short_object':51,'long_object':53,}
 ET_TRIG_DICT = {'blink': 99, 'saccade': 98, 'fixation': 97}
 SUBJECT_NUMBER_IDX = 1
 MODALIDY_IDX = 2
@@ -96,6 +97,7 @@ raw.set_eeg_reference()
 raw = set_reg_eog(raw)
 
 raw = raw.resample(RESAMPLE_FREQ, n_jobs=12)
+unfiltered_raw = raw.copy()  # make a copy before filtering
 
 raw.filter(h_freq=None, l_freq=low_cutoff_freq, n_jobs=12)
 raw.notch_filter(freqs=np.arange(50, 251, 50), n_jobs=12)
@@ -103,12 +105,8 @@ plot_all_channels_var(raw, max_val=4e-7, threshold=100e-10)  # max value for vis
 
 raw.plot(n_channels=60, duration=50)  # raw data inspection for marking bad electrodes and big chunks of bad data
 manual_annot = raw.annotations  # saved for later in the script
-copy_raw = raw.copy()  # make a copy before adding the new channel
 
 # %% interpolate bad channels
-# raw_eeg = raw.copy().pick_types(meg=False, eeg=True, exclude=[])
-# raw_eeg = raw_eeg.interpolate_bads(mode='fast', verbose=True)
-# raw._data[0:256] = raw_eeg._data[0:256] #replace with interpolated data
 raw = raw.interpolate_bads(mode='fast', verbose=True)
 raw.set_eeg_reference()
 
@@ -119,5 +117,5 @@ raw.annotations.save(
     join(save_dir, f"{subject_string}_task-{modality}-{low_cutoff_freq:.2f}hpf-rejections-annotations.fif"))
 raw.save(
     join(save_dir, f"{subject_string}_task-{modality}-{low_cutoff_freq:.2f}hpf-rejections-raw.fif"))
-copy_raw.save(
+unfiltered_raw.save(
     join(save_dir, f"{subject_string}_task-{modality}-unfiltered-raw.fif"))

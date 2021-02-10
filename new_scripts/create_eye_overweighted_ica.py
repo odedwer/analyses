@@ -73,7 +73,7 @@ raw = add_eytracker_triggers(raw, join(save_dir, et_filename))
 # %% overweight
 events = mne.find_events(raw, stim_channel="Status", mask=255, min_duration= 2/ raw.info['sfreq'])
 raw_for_ica, threshold_autoreject = multiply_event(raw, TRIG_DICT, events,
-                                                   saccade_id=ET_TRIG_DICT["saccade"], size_new=OVERWEIGHT)
+                                                   saccade_id=ET_TRIG_DICT["saccade"], size_new=OVERWEIGHT) #select a high threshold here to include blinks!
 
 
 # %% fit ICA

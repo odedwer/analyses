@@ -366,6 +366,7 @@ def fixation_saccade_variance_ratio(raw, ica, events,
     raw_sac.plot(title="saccade epochs")
     return dict(zip(source_raw.ch_names, var_ratio))
 
+
 def plot_ica_component(raw, ica, events, event_dict, stimuli, comp_start):
     """
     plot a component -
@@ -427,7 +428,7 @@ def plot_ica_component(raw, ica, events, event_dict, stimuli, comp_start):
                                            command=self.move_up)
             self.button_switch_up.pack(side=RIGHT)
             self.button_switch_down = Button(self.master, text="<-",
-                                     command=self.move_down)
+                                             command=self.move_down)
             self.button_switch_down.pack(side=LEFT)
 
         def draw_graph(self, index):
@@ -711,9 +712,8 @@ def multiply_event(raw, event_dict, events, saccade_id=98,
                                preload=True,
                                reject_by_annotation=True)  # currently includes mean-centering - should we?
 
-    threshold = autoreject.get_rejection_threshold(epochs_trials)
-    threshold['eeg'] *= 2
-    threshold['eog'] *= 3
+    threshold = get_rejection_threshold(epochs_trials)[0]
+    print(threshold)
     n_trials = len(epochs_trials)
     epochs_trials.drop_bad(reject=threshold)
     print(
@@ -753,7 +753,8 @@ def duration_tracking(epo_A, epo_B, time_diff, p_thresh=0.01) -> np.array:
 
     return dt_scores
 
-def duration_tracking_new(epo_A, epo_B, channel,time_diff, cluster_thresh_t=1,nperm=2000, alpha=0.05):
+
+def duration_tracking_new(epo_A, epo_B, channel, time_diff, cluster_thresh_t=1, nperm=2000, alpha=0.05):
     """
     A channel is defined as duration tracking and gets a score only if there is a signficant cluster between the epochs
      in the relevant time (end of short to end of long)
@@ -765,11 +766,11 @@ def duration_tracking_new(epo_A, epo_B, channel,time_diff, cluster_thresh_t=1,np
     epochs_perm_A = epo_A._data[:, epo_A.ch_names.index(channel), samples_of_int]
     epochs_perm_B = epo_B._data[:, epo_B.ch_names.index(channel), samples_of_int]
     T_obs, clusters, cluster_p_values, H0 = \
-        mne.stats.permutation_cluster_test([epochs_perm_A,epochs_perm_B],
-                                                 n_permutations=nperm, seed=1,
-                                                 threshold=cluster_thresh_t, tail=1,
-                                                 out_type='mask', verbose='ERROR')
-    dt_score = np.mean(T_obs) #* (sum(cluster_p_values < alpha) > 0)  # send to zero if no significant cluster
+        mne.stats.permutation_cluster_test([epochs_perm_A, epochs_perm_B],
+                                           n_permutations=nperm, seed=1,
+                                           threshold=cluster_thresh_t, tail=1,
+                                           out_type='mask', verbose='ERROR')
+    dt_score = np.mean(T_obs)  # * (sum(cluster_p_values < alpha) > 0)  # send to zero if no significant cluster
     return dt_score, cluster_p_values
 
 
@@ -813,7 +814,8 @@ def add_eytracker_triggers(raw: mne.io.Raw, et_file) -> mne.io.Raw:
         fixation_times.astype(np.int)] = 97  # set fixations
     return raw
 
-def ttest_on_epochs(epochs,channel, alpha=0.05,title="epochs"):
+
+def ttest_on_epochs(epochs, channel, alpha=0.05, title="epochs"):
     """
     gets on epoch and conducts 1 sample t-test for a specific electrode to test the hypothesis the mean is higher from zero
     :param epochs: the epochs file to be tested
@@ -878,8 +880,49 @@ def vrange(starts, stops) -> np.arange:
     return np.repeat(stops - l.cumsum(), l) + np.arange(l.sum())
 
 
+def get_rejection_threshold(epochs, min_thresh=30e-6, max_thresh=600e-6, n_thresh=100):
+    """
+
+    :param epochs:
+    :param eog:
+    :param min_thresh:
+    :param max_thresh:
+    :param n_thresh:
+    :return:
+    """
+    epochs_data = epochs.get_data(picks='eeg')  # shape (n_epoch, n_elec, time)
+    peak_to_peak_voltage = np.max(epochs_data, axis=2) - np.min(epochs_data, axis=2)
+    peak_to_peak_voltage = np.max(peak_to_peak_voltage, axis=1)
+    thresholds = np.linspace(min_thresh, max_thresh, n_thresh)
+    rejections = np.repeat(thresholds, peak_to_peak_voltage.size).reshape(peak_to_peak_voltage.shape + thresholds.shape,
+                                                                          order='F')
+    rejections: np.array = peak_to_peak_voltage[:, None] > rejections
+    reject_sum = np.sum(rejections, axis=0)
+    reject_percentage = 100 * (reject_sum / peak_to_peak_voltage.shape[0])
+    pairs = list(map(np.array, zip(thresholds, reject_percentage)))
+    p1, p2 = pairs[0], pairs[-1]
+    norm = np.linalg.norm(p2 - p1)
+    distances = np.zeros(len(pairs))
+    for i, p in enumerate(pairs):
+        distances[i] = np.linalg.norm(np.cross(p2 - p1, p1 - p)) / norm
+    max_dist_index = np.argmax(distances)
+
+    fig = plt.figure()
+    ax: plt.Axes = fig.subplots()
+    ax.plot(thresholds, reject_percentage)
+    ax.set_xlabel("thresholds")
+    ax.set_ylabel("% Rejected epochs")
+
+    ax.hlines([5, 10, 15, 20, 25], 0, np.max(thresholds), linestyles=":",
+              label="reject percentages - 5:25 %")
+    ax.vlines(thresholds[max_dist_index], 0, np.max(reject_percentage), linestyles=":", color="red",label="elbow")
+    ax.legend()
+    plt.show()
+    selected_thresh = {'eeg':plt.ginput(timeout=0)[0][0]}
+    return selected_thresh,pairs
+
 def raw_annotate_peak_to_peak(raw: mne.io.Raw,
-                              threshold: [dict, float, int] = 40e-6,
+                              threshold: [dict, float, int, np.array] = 40e-6,
                               trig_dict=None, reject_tmin=-0.1,
                               reject_tmax=1.5,
                               events: [np.array, None] = None) -> None:
@@ -907,13 +950,19 @@ def raw_annotate_peak_to_peak(raw: mne.io.Raw,
         if 'eeg' not in threshold:
             raise KeyError("'eeg' not a key in trig_dict")
         threshold = threshold['eeg']
-    elif not isinstance(threshold, int) or isinstance(threshold, float):
-        raise ValueError("Threshold must be a dictionary, float or an int!")
-    else:
+    elif isinstance(threshold, int) or isinstance(threshold, float):
         threshold = float(threshold)
+    elif isinstance(threshold, np.array):
+        if len(threshold.shape) == 1:
+            threshold = threshold[:, None]
+        if threshold.shape[0] != raw.get_data().shape[0]:
+            raise ValueError(
+                f'Threshold shape does not match the number of electrodes: n_elec: {raw.get_data().shape[0]}, threshold shape: {threshold.shape[0]}')
+    else:
+        raise ValueError("Threshold must be a dictionary, float or an int!")
     if not events:
         # if events are not given, take only events that are in trig_dict
-        events = mne.find_events(raw, mask=255, mask_type='and')
+        events = mne.find_events(raw, mask=255, mask_type='and',min_duration=2 / raw.info['sfreq'])
         if trig_dict is not None:
             events = events[np.isin(events[:, 2], list(trig_dict.values())), :]
     # calculate number of samples for the given tmin, tmax
@@ -934,6 +983,32 @@ def raw_annotate_peak_to_peak(raw: mne.io.Raw,
     min_voltage = np.min(epoched_data, axis=1)
     reject = abs(max_voltage - min_voltage) > threshold
     reject = np.sum(reject, axis=0) > 1
+    print(f"Rejected {reject.sum()} epochs")
     # add 'bad' annotation for the entire epoch duration (tmin to tmax) of
     # epochs that contained peak to peak voltage above the threshold
-    raw._annotations.append(starts[reject], reject_tmax - reject_tmin, 'bad')
+    raw._annotations.append(raw.times[starts[reject]], reject_tmax - reject_tmin, 'BAD_')
+
+
+def total_onset_power(epochs, channel, time_start=0.1, time_stop=0.5, nperm=2000, cluster_thresh_t=1, alpha=0.05):
+    """
+    An electrode is marked as onset responsive if there is at least 1 significant cluster between 100 to 500 ms.
+    Onset responsiveness score is the average of all t-tests in the response if there is a significant cluster, otherwise zero
+    Gets an epochs of band power (like 60-120) and calculates the average t-score of the time of interest. also returns
+    the p-value of a permutation test of this onset cluster.
+    :param alpha: float. the threshold for significance of a cluster
+    :param epochs: epochs of band power
+    :param time_start: float, time from which to sum t scores
+    :param time_stop: float, time from which to sum t scores
+    :return: average of t score in time of interest, cluster p-values
+    """
+    epochs_perm = epochs.copy()
+    samples_of_int = (epochs_perm.times > time_start) & (
+            epochs_perm.times < time_stop)  # take only the timepoints of interest
+    T_obs, clusters, cluster_p_values, H0 = \
+        mne.stats.permutation_cluster_1samp_test(
+            epochs_perm._data[:, epochs_perm.ch_names.index(channel), samples_of_int],
+            n_permutations=nperm, seed=1,
+            threshold=cluster_thresh_t, tail=1,
+            out_type='mask', verbose='ERROR')
+    responsivnes_score = 1 * (sum(cluster_p_values < alpha) > 0)  # send to zero if no significant cluster
+    return responsivnes_score, np.mean(T_obs), cluster_p_values
