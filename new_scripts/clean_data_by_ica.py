@@ -100,7 +100,8 @@ epochs_filt = mne.Epochs(raw_filtered, events, event_id=TRIG_DICT,
 #     ica.plot_properties(epochs_filt, picks=i)
 #     input(f"press enter to continue to component {i+1}")
 ica.plot_components()
-# ica.exclude = plot_ica_component(raw_filtered, ica, events, dict(**TRIG_DICT, **ET_TRIG_DICT), stimuli, comp_start)
+
+ica.exclude = plot_ica_component(raw_filtered, ica, events, dict(**TRIG_DICT, **ET_TRIG_DICT), stimuli, comp_start)
 
 # %% apply solution and epoch for ERPs
 ica.apply(raw_unfiltered)
@@ -112,11 +113,36 @@ epochs_filt_clean = mne.Epochs(raw_filt, events, event_id=TRIG_DICT,
                     tmin=-0.4, tmax=1.9, baseline=(-0.25, -0.1),
                     reject_tmin=-.1, reject_tmax=1.5,  # reject based on 100 ms before trial onset and 1500 after
                     preload=True, reject_by_annotation=True)
+
+
 threshold = autoreject.get_rejection_threshold(epochs_filt_clean)
 threshold['eeg'] *= 2
 threshold['eog'] *= 3
 n_trials = len(epochs_filt_clean)
 epochs_filt_clean.drop_bad(reject=threshold)
+
+#%%local autoreject
+
+n_interpolates = np.array([1, 4, 32])
+consensus_percs = np.linspace(0, 1.0, 11)
+
+from mne.utils import check_random_state  # noqa
+from mne.datasets import sample  # noqa
+from autoreject import (AutoReject, set_matplotlib_defaults)  # noqa
+check_random_state(42)
+picks = mne.pick_types(raw.info, eeg=True, stim=False, eog=False,
+                       include=[], exclude=[])
+ar = AutoReject(n_interpolates, consensus_percs, picks=picks,
+                thresh_method='bayesian_optimization', random_state=42, n_jobs=12)
+
+ar.fit(epochs)
+epochs_clean = ar.transform(epochs)
+evoked_clean = epochs_clean.average()
+evoked = epochs.average()
+ar.get_reject_log(epochs).plot()
+
+
+#%%
 print(f"removed {n_trials - len(epochs_filt_clean)} trials by peak to peak rejection with threshold {np.round(threshold['eeg'],5)} V on eeg and {np.round(threshold['eog'],5)} V on eog")
 epochs_filt_clean.plot()
 

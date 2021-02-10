@@ -688,8 +688,8 @@ def duration_tracking_new(epo_A, epo_B, channel,time_diff, cluster_thresh_t=1,np
                                                  n_permutations=nperm, seed=1,
                                                  threshold=cluster_thresh_t, tail=1,
                                                  out_type='mask', verbose='ERROR')
-    dt_score = np.mean(T_obs) * (sum(cluster_p_values < alpha) > 0)  # send to zero if no significant cluster
-    return dt_score, np.mean(T_obs), cluster_p_values
+    dt_score = np.mean(T_obs) #* (sum(cluster_p_values < alpha) > 0)  # send to zero if no significant cluster
+    return dt_score, cluster_p_values
 
 
 def add_eytracker_triggers(raw, et_file):

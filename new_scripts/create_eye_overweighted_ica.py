@@ -76,7 +76,7 @@ raw_for_ica, threshold_autoreject = multiply_event(raw, TRIG_DICT, events,
                                                    saccade_id=ET_TRIG_DICT["saccade"], size_new=OVERWEIGHT)
 
 
-# %% fit ICA - ameen run this
+# %% fit ICA
 ica = mne.preprocessing.ICA(n_components=.95, method='infomax',
                             random_state=97, max_iter=800, fit_params=dict(extended=True))
 ica.fit(raw_for_ica, reject_by_annotation=True, reject=threshold_autoreject)
