@@ -109,10 +109,11 @@ epochs = mne.Epochs(raw_unfiltered, events, event_id=TRIG_DICT,
                     reject_tmin=-.1, reject_tmax=1.5,  # reject based on 100 ms before trial onset and 1500 after
                     preload=True, reject_by_annotation=True)
 epochs.plot_image(picks=['A1'])
+
 #%% annotate by peak to peak
 raw_filtered = raw_unfiltered.copy().filter(l_freq=1,h_freq=None)
-threshold=get_rejection_threshold(raw_filtered)
-raw_annotate_peak_to_peak(raw_filtered,threshold,TRIG_DICT)
+threshold=get_rejection_threshold(epochs)
+raw_annotate_peak_to_peak(raw_filtered,threshold[0],TRIG_DICT)
 raw_unfiltered.set_annotations(raw_filtered.annotations)
 # %% TFR plots
 power_long_H = tfr_multitaper(epochs[stimuli[1::2]], freqs=freqsH, average=False,
@@ -160,7 +161,7 @@ for i in range(nbands):
 
 ##  compute mean of all filter bands
 raw_hilb[0]._data = (raw_hilb[0]._data + raw_hilb[1]._data + raw_hilb[2]._data) / nbands
-# raw_hilb[0].filter(l_freq=1,h_freq=30) # should I?
+raw_hilb[0].filter(l_freq=1,h_freq=30) # should I?
 
 # %% epoch and compute duration tracking scores
 epochs_hilb = mne.Epochs(raw_hilb[0], events, event_id=TRIG_DICT,
@@ -169,8 +170,8 @@ epochs_hilb = mne.Epochs(raw_hilb[0], events, event_id=TRIG_DICT,
                          preload=True, reject_by_annotation=True)
 epochs_hilb.apply_baseline((-.3, -.05), verbose=True)
 epochs_hilb._data /= 1e-06  # for scale
-epochs_HFB_L = epochs_hilb['long_word']  # ['long_body','long_face','long_place','long_object','long_pattern'] #
-epochs_HFB_S = epochs_hilb['short_word']  # ['short_body','short_face','short_place','short_object','short_pattern'] ##
+epochs_HFB_L = epochs_hilb[stimuli[1::2]] #['long_word']  # ['long_body','long_face','long_place','long_object','long_pattern'] #
+epochs_HFB_S = epochs_hilb[stimuli[::2]]#['short_word']  # ['short_body','short_face','short_place','short_object','short_pattern'] ##
 evokedHFB_L = epochs_HFB_L.average()
 evokedHFB_S = epochs_HFB_S.average()
 
@@ -181,9 +182,9 @@ dt_scores = [
 print("Done with duration tracking")
 onset_resp_score = [total_onset_power(epochs_hilb, ch, nperm=1000, alpha=0.01)[0] for ch in epochs_hilb.ch_names[:-9]]
 # %%
-mne.viz.plot_topomap(dt_scores, epochs_hilb.info)
+mne.viz.plot_topomap(dt_scores, epochs_hilb.info,vmax=5)
 # %%
-mne.viz.plot_topomap(onset_resp_score, epochs_hilb.info, cmap='Blues')
+mne.viz.plot_topomap(onset_resp_score, epochs_hilb.info, cmap='Blues',vmax=5)
 # %%
 mne.viz.plot_topomap(np.array(onset_resp_score) * np.array(dt_scores), epochs_hilb.info, cmap='Greens')
 

@@ -70,11 +70,10 @@ MODALITY_MSG = "Please enter the modality (auditory_w/auditory_b/visual): "
 HPF_MSG = "Please enter the higphass filter cutoff:"
 SUBJECT_MSG = "Please enter the subject number:"
 BASE_DATA_DIR = "S:\Lab-Shared\Experiments\HighDenseGamma\data"
-TRIG_DICT = {'short_body':11, 'long_body':13,
-             'short_face':21,'long_face':23,
-             'short_place':31,'long_place':33,
-             'short_pattern':41,'long_pattern':43,
-             'short_object':51,'long_object':53,}
+TRIG_DICT = {"short_object":110,"long_object":112,
+             "short_pattern":120,"long_pattern":122,
+             "short_face":130,"long_face":132,
+             "short_body":140,"long_body":142}
 ET_TRIG_DICT = {'blink': 99, 'saccade': 98, 'fixation': 97}
 SUBJECT_NUMBER_IDX = 1
 MODALIDY_IDX = 2
@@ -95,7 +94,6 @@ raw = set_reg_eog(raw)
 raw.drop_channels(CHANNELS_TO_DROP)  # default in the data that are not recorded
 raw.set_eeg_reference()
 raw = set_reg_eog(raw)
-
 raw = raw.resample(RESAMPLE_FREQ, n_jobs=12)
 unfiltered_raw = raw.copy()  # make a copy before filtering
 
@@ -105,17 +103,18 @@ plot_all_channels_var(raw, max_val=4e-7, threshold=100e-10)  # max value for vis
 
 raw.plot(n_channels=60, duration=50)  # raw data inspection for marking bad electrodes and big chunks of bad data
 manual_annot = raw.annotations  # saved for later in the script
-
+unfiltered_raw.info['bads'] = raw.info['bads']
+unfiltered_raw.set_annotations(raw.annotations)
 # %% interpolate bad channels
-raw = raw.interpolate_bads(mode='fast', verbose=True)
+
 raw.set_eeg_reference()
 
 subject_string = f"sub-{subject_num}"
 save_dir = join(BASE_DATA_DIR, subject_string, "eeg", modality)
 # %%
 raw.annotations.save(
-    join(save_dir, f"{subject_string}_task-{modality}-{low_cutoff_freq:.2f}hpf-rejections-annotations.fif"))
+    join(save_dir, f"{subject_string}_task-{modality}-{low_cutoff_freq:.2f}hpf-rejections-annot.fif"))
 raw.save(
-    join(save_dir, f"{subject_string}_task-{modality}-{low_cutoff_freq:.2f}hpf-rejections-raw.fif"))
+    join(save_dir, f"{subject_string}_task-{modality}-{low_cutoff_freq:.2f}hpf-rejections-raw.fif"),overwrite=True)
 unfiltered_raw.save(
-    join(save_dir, f"{subject_string}_task-{modality}-unfiltered-raw.fif"))
+    join(save_dir, f"{subject_string}_task-{modality}-unfiltered-raw.fif"),overwrite=True)

@@ -49,11 +49,10 @@ MODALITY_MSG = "Please enter the modality (auditory/visual): "
 HPF_MSG = "Please enter the higphass filter cutoff: "
 SUBJECT_MSG = "Please enter the subject number: "
 BASE_DATA_DIR = "S:\Lab-Shared\Experiments\HighDenseGamma\data"
-TRIG_DICT = {'short_body':11, 'long_body':13,
-             'short_face':21,'long_face':23,
-             'short_place':31,'long_place':33,
-             'short_pattern':41,'long_pattern':43,
-             'short_object':51,'long_object':53,}
+TRIG_DICT = {"short_object":110,"long_object":112,
+             "short_pattern":120,"long_pattern":122,
+             "short_face":130,"long_face":132,
+             "short_body":140,"long_body":142}
 ET_TRIG_DICT = {'blink': 99, 'saccade': 98, 'fixation': 97}
 OVERWEIGHT = 5  # How many times to overweight saccades
 SUBJECT_NUMBER_IDX = 1
@@ -76,8 +75,6 @@ unfiltered_filename = f"sub-{subject_num}_task-{modality}-unfiltered-raw.fif"
 raw_filtered = mne.io.read_raw_fif(join(save_dir, filtered_filename), preload=True)
 raw_unfiltered = mne.io.read_raw_fif(join(save_dir, unfiltered_filename), preload=True)
 ica = mne.preprocessing.read_ica(join(save_dir, ica_filename))
-raw_unfiltered.info['bads'] = raw_filtered.info['bads']
-raw_unfiltered._annotations = raw_filtered._annotations
 
 # %% variance ratio
 events = mne.find_events(raw_filtered, stim_channel="Status", mask=255, min_duration= 2/ raw_filtered.info['sfreq'])
@@ -103,10 +100,18 @@ ica.plot_components()
 
 ica.exclude = plot_ica_component(raw_filtered, ica, events, dict(**TRIG_DICT, **ET_TRIG_DICT), stimuli, comp_start)
 
+ica_raw=ica.get_sources(raw_filtered)
+for name in ica_raw.ch_names:
+    dict[name] = "eeg"
+ica_raw.set_channel_types(dict)
+ica_raw.plot_psd(picks=ica_raw.ch_names[28],n_overlap=int(0.2*raw_filtered.info['sfreq']),
+                 n_fft=int(2*raw_filtered.info['sfreq']),spatial_colors=False)
+
 # %% apply solution and epoch for ERPs
 ica.apply(raw_unfiltered)
 raw_filt = raw_unfiltered.copy().filter(l_freq=1, h_freq=30)  # performing filtering on copy of raw data, not on raw itself or epochs
 raw_filt.notch_filter([50, 100, 150])  # notch filter
+raw_filt = raw_filt.interpolate_bads(mode='accurate', verbose=True)
 events = mne.find_events(raw_unfiltered, stim_channel="Status", mask=255, min_duration= 2/ raw_unfiltered.info['sfreq'])
 
 epochs_filt_clean = mne.Epochs(raw_filt, events, event_id=TRIG_DICT,

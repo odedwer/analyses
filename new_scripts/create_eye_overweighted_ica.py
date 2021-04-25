@@ -46,11 +46,10 @@ MODALITY_MSG = "Please enter the modality (auditory_w/auditory_b/visual): "
 HPF_MSG = "Please enter the higphass filter cutoff: "
 SUBJECT_MSG = "Please enter the subject number: "
 BASE_DATA_DIR = "S:\Lab-Shared\Experiments\HighDenseGamma\data"
-TRIG_DICT = {'short_body':11, 'long_body':13,
-             'short_face':21,'long_face':23,
-             'short_place':31,'long_place':33,
-             'short_pattern':41,'long_pattern':43,
-             'short_object':51,'long_object':53}
+TRIG_DICT = {"short_object":110,"long_object":112,
+             "short_pattern":120,"long_pattern":122,
+             "short_face":130,"long_face":132,
+             "short_body":140,"long_body":142}
 ET_TRIG_DICT = {'blink': 99, 'saccade': 98, 'fixation': 97}
 OVERWEIGHT = 5  # How many times to overweight saccades
 SUBJECT_NUMBER_IDX = 1
@@ -71,7 +70,8 @@ if(modality!="visual"):
 raw = add_eytracker_triggers(raw, join(save_dir, et_filename))
 
 # %% overweight
-events = mne.find_events(raw, stim_channel="Status", mask=255, min_duration= 2/ raw.info['sfreq'])
+events = mne.find_events(raw, stim_channel="Status", mask=255, min_duration= 1/ raw.info['sfreq']) #MUST BE 1!! OTHERWISE MAY LOSE TRIGGERS
+
 raw_for_ica, threshold_autoreject = multiply_event(raw, TRIG_DICT, events,
                                                    saccade_id=ET_TRIG_DICT["saccade"], size_new=OVERWEIGHT) #select a high threshold here to include blinks!
 

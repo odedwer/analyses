@@ -670,7 +670,7 @@ def ica_checker(raw, ica):
 
 def multiply_event(raw, event_dict, events, saccade_id=98,
                    cut_before_event=30 / 1000, cut_after_event=50 / 1000,
-                   cut_epochs=1.7, size_new=1) -> tp.Tuple[mne.io.Raw, dict]:
+                   cut_epochs=2, size_new=1) -> tp.Tuple[mne.io.Raw, dict]:
     """
     The function creates a new raw data for ICA,
      with the extension being a multiplication of allwanted events, in order to create dominant components in the ICA.
@@ -952,7 +952,7 @@ def raw_annotate_peak_to_peak(raw: mne.io.Raw,
         threshold = threshold['eeg']
     elif isinstance(threshold, int) or isinstance(threshold, float):
         threshold = float(threshold)
-    elif isinstance(threshold, np.array):
+    elif isinstance(threshold, np.ndarray):
         if len(threshold.shape) == 1:
             threshold = threshold[:, None]
         if threshold.shape[0] != raw.get_data().shape[0]:
@@ -1010,5 +1010,5 @@ def total_onset_power(epochs, channel, time_start=0.1, time_stop=0.5, nperm=2000
             n_permutations=nperm, seed=1,
             threshold=cluster_thresh_t, tail=1,
             out_type='mask', verbose='ERROR')
-    responsivnes_score = 1 * (sum(cluster_p_values < alpha) > 0)  # send to zero if no significant cluster
+    responsivnes_score = np.mean(T_obs) * (sum(cluster_p_values < alpha) > 0)  # send to zero if no significant cluster
     return responsivnes_score, np.mean(T_obs), cluster_p_values
