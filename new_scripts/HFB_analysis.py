@@ -68,11 +68,10 @@ MODALITY_MSG = "Please enter the modality (auditory/visual): "
 HPF_MSG = "Please enter the higphass filter cutoff: "
 SUBJECT_MSG = "Please enter the subject number: "
 BASE_DATA_DIR = "S:\Lab-Shared\Experiments\HighDenseGamma\data"
-TRIG_DICT = {'short_body': 11, 'long_body': 13,
-             'short_face': 21, 'long_face': 23,
-             'short_place': 31, 'long_place': 33,
-             'short_pattern': 41, 'long_pattern': 43,
-             'short_object': 51, 'long_object': 53}
+TRIG_DICT = {"short_object":110,"long_object":112,
+             "short_pattern":120,"long_pattern":122,
+             "short_face":130,"long_face":132,
+             "short_body":140,"long_body":142}
 ET_TRIG_DICT = {'blink': 99, 'saccade': 98, 'fixation': 97}
 OVERWEIGHT = 5  # How many times to overweight saccades
 SUBJECT_NUMBER_IDX = 1
@@ -96,13 +95,16 @@ stimuli = list(TRIG_DICT.keys())
 freq_range = [5, 200]
 base_correction = (-0.25, -.10)  # when epoch starts at -0.400
 correction_mode = 'logratio'
-time_end_short = int(modality == "visual") * 0.5 + int(modality != "visual") * 0.8
-time_end_long = int(modality == "visual") * 1.2 + int(modality != "visual") * 1.5
+time_end_short = int(modality == "visual") * 0.5 +\
+                 int(modality == "auditory_w") * 0.65 + int(modality == "auditory_b") * 0.65
+time_end_long = int(modality == "visual") * 1.2 +\
+                int(modality == "auditory_w") * 1.45 + int(modality == "auditory_b") * 1.5
 freqsH = np.logspace(5, 7.6, 50, base=2)
 freqs_all = np.logspace(1, 7.6, 40, base=2)
 freqsL = np.logspace(1, 5, 40, base=2)
 
 # %% create unfiltered epochs
+raw_unfiltered.interpolate_bads()
 events = mne.find_events(raw_unfiltered, stim_channel="Status", mask=255, min_duration=2 / raw_unfiltered.info['sfreq'])
 epochs = mne.Epochs(raw_unfiltered, events, event_id=TRIG_DICT,
                     tmin=-0.4, tmax=1.9, baseline=(-0.25, -0.1),
@@ -165,7 +167,7 @@ raw_hilb[0].filter(l_freq=1,h_freq=30) # should I?
 
 # %% epoch and compute duration tracking scores
 epochs_hilb = mne.Epochs(raw_hilb[0], events, event_id=TRIG_DICT,
-                         tmin=-0.4, tmax=1.9, baseline=None,
+                         tmin=-0.4, tmax=2, baseline=None,
                          reject_tmin=-.1, reject_tmax=time_end_long + .3,
                          preload=True, reject_by_annotation=True)
 epochs_hilb.apply_baseline((-.3, -.05), verbose=True)
@@ -174,7 +176,6 @@ epochs_HFB_L = epochs_hilb[stimuli[1::2]] #['long_word']  # ['long_body','long_f
 epochs_HFB_S = epochs_hilb[stimuli[::2]]#['short_word']  # ['short_body','short_face','short_place','short_object','short_pattern'] ##
 evokedHFB_L = epochs_HFB_L.average()
 evokedHFB_S = epochs_HFB_S.average()
-
 # %%
 dt_scores = [
     duration_tracking_new(epochs_HFB_L, epochs_HFB_S, ch, time_diff=[time_end_short + .1, time_end_long + .1], nperm=1)[0]
@@ -186,8 +187,8 @@ mne.viz.plot_topomap(dt_scores, epochs_hilb.info,vmax=5)
 # %%
 mne.viz.plot_topomap(onset_resp_score, epochs_hilb.info, cmap='Blues',vmax=5)
 # %%
-mne.viz.plot_topomap(np.array(onset_resp_score) * np.array(dt_scores), epochs_hilb.info, cmap='Greens')
-
+mne.viz.plot_topomap(np.sqrt(np.array(onset_resp_score) * np.array(dt_scores)), epochs_hilb.info, cmap='Greens')
+plt.title("sqrt of HFB response (average t-value)")
 # %%
 electrode = input("Electrode?")
 # times_significant_short = ttest_on_epochs(epochs_HFB_S, electrode, title="Short epochs")
@@ -195,14 +196,15 @@ electrode = input("Electrode?")
 # times_significant_long = ttest_on_epochs(epochs_HFB_L, electrode, title="Long epochs")
 
 # %%
-plt.bar(raw_unfiltered.ch_names[0:256], dt_scores)
-plt.plot(raw_unfiltered.ch_names[0:256], dt_scores)
+plt.bar(raw_unfiltered.ch_names[0:256], np.sqrt(np.array(onset_resp_score) * np.array(dt_scores)))
+plt.plot(raw_unfiltered.ch_names[0:256], np.sqrt(np.array(onset_resp_score) * np.array(dt_scores)))
 plt.show()
+#%%
 
 # %%
-mne.viz.plot_compare_evokeds({"Long": evokedHFB_L, "Short": evokedHFB_S}, electrode,
-                             title="Long and short HFB", vlines=[time_end_short, time_end_long])
-
+plot_evokeds_with_CI({"Long": epochs_HFB_L, "Short": epochs_HFB_S},channel='B18',
+                     colors_dict={"Long": 'Blue', "Short": "darkred"},
+                     title="Long and short HFB", vlines=[time_end_short, time_end_long])
 # %% save
 epochs_HFB_L.save(join(save_dir, f"sub-{subject_num}_task-{modality}-long-58-122-hfb-epo.fif"), overwrite=True)
 epochs_HFB_S.save(join(save_dir, f"sub-{subject_num}_task-{modality}-short-58-122-hfb-epo.fif"), overwrite=True)

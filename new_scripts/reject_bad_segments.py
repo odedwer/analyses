@@ -105,7 +105,6 @@ raw.plot(n_channels=60, duration=50)  # raw data inspection for marking bad elec
 manual_annot = raw.annotations  # saved for later in the script
 unfiltered_raw.info['bads'] = raw.info['bads']
 unfiltered_raw.set_annotations(raw.annotations)
-# %% interpolate bad channels
 
 raw.set_eeg_reference()
 

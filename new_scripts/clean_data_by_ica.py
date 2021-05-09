@@ -76,36 +76,41 @@ raw_filtered = mne.io.read_raw_fif(join(save_dir, filtered_filename), preload=Tr
 raw_unfiltered = mne.io.read_raw_fif(join(save_dir, unfiltered_filename), preload=True)
 ica = mne.preprocessing.read_ica(join(save_dir, ica_filename))
 
-# %% variance ratio
-events = mne.find_events(raw_filtered, stim_channel="Status", mask=255, min_duration= 2/ raw_filtered.info['sfreq'])
+# variance ratio
+events = mne.find_events(raw_filtered, stim_channel="Status", mask=255, min_duration= 1/ raw_filtered.info['sfreq'])
 ratios = fixation_saccade_variance_ratio(raw_filtered,ica,events)
 
-# %% inspect
+# %% inspection code ,  plot properties, inspect TFR, see all topos and look at psd's together
 ica.plot_sources(raw_filtered)
 
 stimuli = ['short_scrambled', 'long_scrambled', 'short_face', 'long_face',
            'short_obj', 'long_obj', 'short_body', 'long_body']
 if modality == 'auditory':
     stimuli = ['long_word', 'short_word']
-comp_start = 0  # from which component to start showing
+
 
 epochs_filt = mne.Epochs(raw_filtered, events, event_id=TRIG_DICT,
                     tmin=-0.4, tmax=1.9, baseline=(-0.25, -0.1),
                     reject_tmin=-.1, reject_tmax=1.5,  # reject based on 100 ms before trial onset and 1500 after
                     preload=True, reject_by_annotation=True)
-# for i in range(len(ica._ica_names)):
-#     ica.plot_properties(epochs_filt, picks=i)
-#     input(f"press enter to continue to component {i+1}")
-ica.plot_components()
 
+#%%
+ica_round = 5*(int(input("enter ica round starting from 1:"))-1)
+ica.plot_properties(epochs_filt, picks=np.arange(5)+ica_round,psd_args={'fmax':120})
+
+#%% can either choose manually or write 000 and go through all of them
+comp_start = f"ICA{input('From which component should we start?')}"  # from which component to start showing
 ica.exclude = plot_ica_component(raw_filtered, ica, events, dict(**TRIG_DICT, **ET_TRIG_DICT), stimuli, comp_start)
 
+#%%
+ica.plot_components()
 ica_raw=ica.get_sources(raw_filtered)
+ch_dict={}
 for name in ica_raw.ch_names:
-    dict[name] = "eeg"
-ica_raw.set_channel_types(dict)
-ica_raw.plot_psd(picks=ica_raw.ch_names[28],n_overlap=int(0.2*raw_filtered.info['sfreq']),
-                 n_fft=int(2*raw_filtered.info['sfreq']),spatial_colors=False)
+    ch_dict[name] = "eeg"
+ica_raw.set_channel_types(ch_dict)
+ica_raw.plot_psd(picks=ica_raw.ch_names[10:18],n_overlap=int(0.2*raw_filtered.info['sfreq']),
+                 n_fft=int(2*raw_filtered.info['sfreq']))
 
 # %% apply solution and epoch for ERPs
 ica.apply(raw_unfiltered)
@@ -121,6 +126,7 @@ epochs_filt_clean = mne.Epochs(raw_filt, events, event_id=TRIG_DICT,
 
 
 selected_thresh, thresholds_pairs = get_rejection_threshold(epochs_filt_clean)
+n_trials = len(epochs_filt_clean)
 epochs_filt_clean.drop_bad(reject=selected_thresh)
 
 #%%

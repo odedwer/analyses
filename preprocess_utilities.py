@@ -434,7 +434,7 @@ def plot_ica_component(raw, ica, events, event_dict, stimuli, comp_start):
         def draw_graph(self, index):
             ica_raw: mne.io.Raw = self.ica.get_sources(self.raw)
             ica_raw = ica_raw.pick(index)
-            freqs = np.logspace(3.5, 7.6, 101, base=2)  # for the TF plots
+            freqs = np.linspace(7, 80, 101)  # for the TF plots
             freqs_to_show = np.arange(0, len(freqs), int(len(freqs) / 10))
             # indexes of freqs to show on the graph later
             data_ica = ica_raw.get_data(picks=0)
@@ -453,27 +453,29 @@ def plot_ica_component(raw, ica, events, event_dict, stimuli, comp_start):
             # self.ax[0, 0].set_xlim([0, 10*ica_raw.info['sfreq']])
             # reject based on 100 ms before trial onset and 1500 after
             epochs_ica = mne.Epochs(ica_raw, events, event_id=event_dict,
-                                    tmin=-0.4, tmax=1.9, baseline=(-0.25, -0.1),
+                                    tmin=-0.4, tmax=2, baseline=(-0.25, -0.1),
                                     reject_tmin=-.1, reject_tmax=1.5,
                                     preload=True, reject_by_annotation=True)
             evoked = epochs_ica.average(picks=0)
             evoked_saccade = epochs_ica['saccade'].average(0).data
+            max_sac = np.max(abs(evoked_saccade)) * 1.1
             self.ax[1, 2].plot((np.arange(len(evoked_saccade[0, :])) /
                                 evoked.info['sfreq'] - 0.4),
                                evoked_saccade[0, :])
             self.ax[1, 2].axhline(0, linestyle="--", color="grey", linewidth=.6)
             self.ax[1, 2].set_title('Saccade ERP')
-            self.ax[1, 2].set_ylim(-2, 2)
+            self.ax[1, 2].set_ylim(-max_sac, max_sac)
             self.ax[1, 2].set_ylabel('μV')
 
             evoked_blink = epochs_ica['blink'].average(0).data
+            max_blink = np.max(abs(evoked_blink)) * 1.1
             self.ax[1, 1].plot((np.arange(len(evoked_blink[0, :])) /
                                 evoked.info['sfreq'] - 0.4),
                                evoked_blink[0, :])
             self.ax[1, 1].axhline(0, linestyle="--", color="grey", linewidth=.6)
             self.ax[1, 1].set_title('Blink ERP')
             self.ax[1, 1].set_ylabel('μV')
-            self.ax[1, 1].set_ylim(-2, 2)
+            self.ax[1, 1].set_ylim(-max_blink, max_blink)
 
             # correls = [np.corrcoef(data_ica, raw._data[i])[0, 1] for i in range(len(self.raw.ch_names))]
             # self.ax[1, 0].bar(x=raw.ch_names, height=correls, color='purple')
@@ -481,23 +483,20 @@ def plot_ica_component(raw, ica, events, event_dict, stimuli, comp_start):
             # self.ax[1, 0].set_ylabel('r')
             evoked_stimulus = epochs_ica[list(event_dict.keys())[2:]].average(
                 0).data
+            max_stim = np.max(abs(evoked_stimulus)) * 1.1
             self.ax[1, 0].plot((np.arange(len(evoked_stimulus[0, :])) /
                                 evoked.info['sfreq'] - 0.4),
                                evoked_stimulus[0, :])
             self.ax[1, 0].axhline(0, linestyle="--", color="grey", linewidth=.6)
             self.ax[1, 0].set_title('Stimulus ERP')
             self.ax[1, 0].set_ylabel('μV')
-            self.ax[1, 0].set_ylim(-3, 3)
+            self.ax[1, 0].set_ylim(-max_stim, max_stim)
             # TF
             power_saccade = tfr_morlet(epochs_ica['saccade'], freqs=freqs,
-                                       average=False,
-                                       n_cycles=np.round(
-                                           np.log((freqs + 13) / 10) * 10),
-                                       use_fft=True,
-                                       return_itc=False, picks=0, decim=3,
-                                       n_jobs=12)
-            TFR_s = power_saccade.average().data
-            times_s = power_saccade.average().times[0:len(TFR_s[0, 0]):55]
+                                       n_cycles=1 + np.round(freqs / 3), use_fft=True,
+                                       return_itc=False, picks=0, decim=3, n_jobs=12)
+            TFR_s = power_saccade.data
+            times_s = power_saccade.times[55:340:55]
             times_s = times_s[1:-1]
             TFR_s_corrected = (TFR_s[0].transpose() - (
                 np.mean(TFR_s[0][:, 40:100], axis=1))).transpose()
@@ -508,21 +507,18 @@ def plot_ica_component(raw, ica, events, event_dict, stimuli, comp_start):
             self.ax[0, 2].set_xlabel('Time (s)')
             self.ax[0, 2].set_yticks(list(freqs_to_show))
             self.ax[0, 2].set_yticklabels(np.round(freqs[freqs_to_show]))
-            time_vec = np.arange(len(TFR_s[0, 0]))[0:len(TFR_s[0, 0]):55]
+            time_vec = np.arange(len(times_s))[55:340:55]
             time_vec = time_vec[1:-1] - 55
             self.ax[0, 2].set_xticks(list(time_vec))
-            self.ax[0, 2].set_xticklabels(np.round(times_s, 1))
+            self.ax[0, 2].set_xticklabels(np.round(times_s, 2))
 
             power_trial = tfr_morlet(epochs_ica[list(event_dict.keys())[2:]],
-                                     freqs=freqs, average=False,
-                                     n_cycles=np.round(
-                                         np.log((freqs + 13) / 10) * 10),
-                                     use_fft=True,
-                                     return_itc=False, picks=0, decim=3,
+                                     freqs=freqs, n_cycles=1 + np.round(freqs / 3),
+                                     use_fft=True, return_itc=False, picks=0, decim=3,
                                      n_jobs=12)
-            TFR_t = power_trial.average().data
-            times_t = power_trial.average().times[
-                      0:len(power_saccade.average().times):55]
+            TFR_t = power_trial.data
+            times_t = power_trial.times[
+                      0:len(power_saccade.times):55]
             times_t = times_t[1:-1]
             TFR_t_corrected = (TFR_t[0].transpose() - (
                 np.mean(TFR_t[0][:, 40:100], axis=1))).transpose()
@@ -536,18 +532,15 @@ def plot_ica_component(raw, ica, events, event_dict, stimuli, comp_start):
             time_vec = np.arange(len(TFR_t[0, 0]))[0:len(TFR_t[0, 0]):55]
             time_vec = time_vec[1:-1] - 55
             self.ax[0, 0].set_xticks(list(time_vec))
-            self.ax[0, 0].set_xticklabels(np.round(times_t, 1))
+            self.ax[0, 0].set_xticklabels(np.round(times_t, 2))
 
             power_blink = tfr_morlet(epochs_ica['blink'], freqs=freqs,
-                                     average=False,
-                                     n_cycles=np.round(
-                                         np.log((freqs + 13) / 10) * 10),
-                                     use_fft=True,
+                                     n_cycles=1 + np.round(freqs / 3),
                                      return_itc=False, picks=0, decim=3,
                                      n_jobs=12)
-            TFR_b = power_blink.average().data
-            times_b = power_blink.average().times[
-                      0:len(power_blink.average().times):55]
+            TFR_b = power_blink.data
+            times_b = power_blink.times[
+                      0:len(power_blink.times):55]
             times_b = times_b[1:-1]
             TFR_b_corrected = (TFR_b[0].transpose() - (
                 np.mean(TFR_b[0][:, 40:100], axis=1))).transpose()
@@ -559,7 +552,7 @@ def plot_ica_component(raw, ica, events, event_dict, stimuli, comp_start):
             self.ax[0, 1].set_yticks(list(freqs_to_show))
             self.ax[0, 1].set_yticklabels(np.round(freqs[freqs_to_show]))
             self.ax[0, 1].set_xticks(list(time_vec))
-            self.ax[0, 1].set_xticklabels(np.round(times_b, 1))
+            self.ax[0, 1].set_xticklabels(np.round(times_b, 2))
 
             # self.ax[1, 0].plot()
             # self.ax[1, 0].set_title('Axis [1, 0]')
@@ -915,11 +908,12 @@ def get_rejection_threshold(epochs, min_thresh=30e-6, max_thresh=600e-6, n_thres
 
     ax.hlines([5, 10, 15, 20, 25], 0, np.max(thresholds), linestyles=":",
               label="reject percentages - 5:25 %")
-    ax.vlines(thresholds[max_dist_index], 0, np.max(reject_percentage), linestyles=":", color="red",label="elbow")
+    ax.vlines(thresholds[max_dist_index], 0, np.max(reject_percentage), linestyles=":", color="red", label="elbow")
     ax.legend()
     plt.show()
-    selected_thresh = {'eeg':plt.ginput(timeout=0)[0][0]}
-    return selected_thresh,pairs
+    selected_thresh = {'eeg': plt.ginput(timeout=0)[0][0]}
+    return selected_thresh, pairs
+
 
 def raw_annotate_peak_to_peak(raw: mne.io.Raw,
                               threshold: [dict, float, int, np.array] = 40e-6,
@@ -962,7 +956,7 @@ def raw_annotate_peak_to_peak(raw: mne.io.Raw,
         raise ValueError("Threshold must be a dictionary, float or an int!")
     if not events:
         # if events are not given, take only events that are in trig_dict
-        events = mne.find_events(raw, mask=255, mask_type='and',min_duration=2 / raw.info['sfreq'])
+        events = mne.find_events(raw, mask=255, mask_type='and', min_duration=2 / raw.info['sfreq'])
         if trig_dict is not None:
             events = events[np.isin(events[:, 2], list(trig_dict.values())), :]
     # calculate number of samples for the given tmin, tmax
@@ -1012,3 +1006,46 @@ def total_onset_power(epochs, channel, time_start=0.1, time_stop=0.5, nperm=2000
             out_type='mask', verbose='ERROR')
     responsivnes_score = np.mean(T_obs) * (sum(cluster_p_values < alpha) > 0)  # send to zero if no significant cluster
     return responsivnes_score, np.mean(T_obs), cluster_p_values
+
+
+def plot_evokeds_with_CI(epochs_dict,channel,colors_dict, ci='se', title=" ", vlines=[], alpha=0.05, nperm=1000, cluster_thresh_t=1):
+    """
+    plots the evoked response with confidence interval. adds a horizontal line for significance in permutation test
+    :param colors_dict:  dict of the form (name:color) with identical naming to epochs_dict
+    :param nperm: int, number of permutations
+    :param alpha: float, significance level
+    :param cluster_thresh_t: float, t-threshold for cluster.
+    :param epochs_dict: dict of the form (name:epochs), must be size 2
+    :param ci: the width of CI. either 'se' - standard error, 'sd' - standard deviation.
+    :param title: str
+    :param vlines: a list of times at which to plot a vertical dashed line.
+    :return: -
+    """
+    if (ci != 'se') & (ci != 'sd'):
+        raise ValueError("Sorry, only se or sd")
+    epochs_names = list(epochs_dict.keys())
+    ch_idx = epochs_dict[epochs_names[0]].ch_names.index(channel)
+    epochs_perm_A = epochs_dict[epochs_names[0]]._data[:, ch_idx]
+    epochs_perm_B = epochs_dict[epochs_names[1]]._data[:, ch_idx]
+    T_obs, clusters, cluster_p_values, H0 = \
+        mne.stats.permutation_cluster_test([epochs_perm_A,epochs_perm_B],
+                                           n_permutations=nperm, seed=1,
+                                           threshold=cluster_thresh_t, tail=1,
+                                           out_type='mask', verbose='ERROR')
+    times = epochs_dict[epochs_names[0]].times
+    plt.figure()
+    plt.axhline(0,color='black',lw=0.75)
+    for vline in vlines:
+        plt.axvline(vline, color='black', linestyle="--",lw=0.75)
+    for name in epochs_dict.keys():
+        curr_evoked = epochs_dict[name].average()
+        n = epochs_dict[name]._data.shape[0]
+        running_sd = epochs_dict[name]._data[:,0].std(axis=0)
+        if ci=='se':
+            running_sd/=np.sqrt(n)
+        plt.plot(times,curr_evoked.data[ch_idx],color=colors_dict[name],label=name) #plot data
+        under_line = curr_evoked.data[ch_idx]-running_sd
+        over_line = curr_evoked.data[ch_idx]+running_sd
+        plt.fill_between(times, under_line, over_line, color=colors_dict[name], alpha=.1)  # std curves.
+        plt.title(title)
+        plt.legend()

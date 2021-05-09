@@ -75,7 +75,7 @@ events = mne.find_events(raw, stim_channel="Status", mask=255, min_duration= 1/ 
 raw_for_ica, threshold_autoreject = multiply_event(raw, TRIG_DICT, events,
                                                    saccade_id=ET_TRIG_DICT["saccade"], size_new=OVERWEIGHT) #select a high threshold here to include blinks!
 
-
+raw_for_ica.info['bads'] = raw.info['bads']
 # %% fit ICA
 ica = mne.preprocessing.ICA(n_components=.95, method='infomax',
                             random_state=97, max_iter=800, fit_params=dict(extended=True))
