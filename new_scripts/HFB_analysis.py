@@ -107,7 +107,7 @@ freqsL = np.logspace(1, 5, 40, base=2)
 raw_unfiltered.interpolate_bads()
 events = mne.find_events(raw_unfiltered, stim_channel="Status", mask=255, min_duration=2 / raw_unfiltered.info['sfreq'])
 epochs = mne.Epochs(raw_unfiltered, events, event_id=TRIG_DICT,
-                    tmin=-0.4, tmax=1.9, baseline=(-0.25, -0.1),
+                    tmin=-0.4, tmax=2, baseline=(-0.25, -0.1),
                     reject_tmin=-.1, reject_tmax=1.5,  # reject based on 100 ms before trial onset and 1500 after
                     preload=True, reject_by_annotation=True)
 epochs.plot_image(picks=['A1'])
@@ -171,7 +171,7 @@ epochs_hilb = mne.Epochs(raw_hilb[0], events, event_id=TRIG_DICT,
                          reject_tmin=-.1, reject_tmax=time_end_long + .3,
                          preload=True, reject_by_annotation=True)
 epochs_hilb.apply_baseline((-.3, -.05), verbose=True)
-epochs_hilb._data /= 1e-06  # for scale
+epochs_hilb._data *= 1e-06  # for scale
 epochs_HFB_L = epochs_hilb[stimuli[1::2]] #['long_word']  # ['long_body','long_face','long_place','long_object','long_pattern'] #
 epochs_HFB_S = epochs_hilb[stimuli[::2]]#['short_word']  # ['short_body','short_face','short_place','short_object','short_pattern'] ##
 evokedHFB_L = epochs_HFB_L.average()
@@ -202,9 +202,10 @@ plt.show()
 #%%
 
 # %%
-plot_evokeds_with_CI({"Long": epochs_HFB_L, "Short": epochs_HFB_S},channel='B18',
-                     colors_dict={"Long": 'Blue', "Short": "darkred"},
+T_obs, clusters, cluster_p_values, _ ,sig_clusters = plot_evokeds_with_CI({"Long": epochs_HFB_L, "Short": epochs_HFB_S},channel='B18',
+                     colors_dict={"Long": 'Blue', "Short": "darkred"}, cluster_thresh_t=0.25, alpha=0.01,nperm=2000,
                      title="Long and short HFB", vlines=[time_end_short, time_end_long])
+
 # %% save
 epochs_HFB_L.save(join(save_dir, f"sub-{subject_num}_task-{modality}-long-58-122-hfb-epo.fif"), overwrite=True)
 epochs_HFB_S.save(join(save_dir, f"sub-{subject_num}_task-{modality}-short-58-122-hfb-epo.fif"), overwrite=True)

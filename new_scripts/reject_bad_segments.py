@@ -13,7 +13,7 @@ from SaccadeDetectorType import SaccadeDetectorType
 from preprocess_utilities import *
 
 
-# %% functions
+# functions
 def read_bdf_files(preload=True):
     """
     :return: List of the raw objects (preloaded)
@@ -88,13 +88,14 @@ low_cutoff_freq = get_highpass_cutoff()
 
 # %% upload raw files
 raw = read_bdf_files(preload=True)
-raw.set_montage(montage=mne.channels.read_custom_montage("S2.elc"), raise_if_subset=False)
+raw.set_montage(montage=mne.channels.read_custom_montage("biosemi256"), raise_if_subset=False)
 raw = set_reg_eog(raw)
 
 raw.drop_channels(CHANNELS_TO_DROP)  # default in the data that are not recorded
 raw.set_eeg_reference()
 raw = set_reg_eog(raw)
-raw = raw.resample(RESAMPLE_FREQ, n_jobs=12)
+events = mne.find_events(raw, stim_channel="Status", mask=255, min_duration= 1/ raw.info['sfreq']) #MUST BE 1!! OTHERWISE MAY LOSE TRIGGERS
+raw,events = raw.resample(RESAMPLE_FREQ, n_jobs=12)
 unfiltered_raw = raw.copy()  # make a copy before filtering
 
 raw.filter(h_freq=None, l_freq=low_cutoff_freq, n_jobs=12)

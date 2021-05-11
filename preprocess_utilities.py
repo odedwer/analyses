@@ -16,6 +16,30 @@ from EyeLinkProcessor import EyeLinkProcessor
 from ParserType import ParserType
 from SaccadeDetectorType import SaccadeDetectorType
 
+"""
+9/5/2021
+Gal Chen & Oded Wertheimer
+Functions:
+save_data - Saves data to be loaded from disk using pickle
+load_data - from given file using pickle
+set_reg_eog - for setting specific channels as 'eog'
+add_bipolar_derivation- adds a channel to the given raw instance that is ch_1-ch_2
+load_raws_from_mat - Reads a single .mat file to mne.io.Raw objects
+plot_correlations - Reads ica and raw and prints correlation matrix of all ica components and electrodes listed.
+plot_all_channels_var - plot the variance of all channels
+annotate_bads_auto - annotates artifacts automatically by threshold criteria
+fixation_saccade_variance_ratio - plots the ratio of variances between saccade and fixation of ICA components
+annotate_breaks - for annotating points of break to be excluded from analysis
+plot_ica_component - ERP and TFR inspection of components
+multiply_event - overweighting saccade epochs for ica
+duration_tracking&duration_tracking_new - function to compute duration tracking scores between electrodes (like https://www.sciencedirect.com/science/article/pii/S1053811917306754)
+add_eytracker_triggers - for adding triggers for saccades, fixations and blinks
+ttest_on_epochs - 1  sample t-test for a specific electrode
+get_rejection_threshold - for decision on threshold to automatically annotate with, based on % of rejected trials
+raw_annotate_peak_to_peak - annotate within epochs by threshold crossing of peak to peak
+total_onset_power - for onset responsiveness score
+plot_evokeds_with_CI - for comparing two conditions with cluster permutation test between them
+"""
 
 def save_data(obj, filename):
     """
@@ -28,7 +52,6 @@ def save_data(obj, filename):
     with open(filename, 'wb') as save_file:
         pickle.dump(obj, save_file, protocol=pickle.HIGHEST_PROTOCOL)
 
-
 def load_data(filename):
     """
     Load data from given file using pickle
@@ -38,7 +61,6 @@ def load_data(filename):
     print("Loading", filename)
     with open(filename, 'rb') as save_file:
         return pickle.load(save_file)
-
 
 #
 # def read_bdf_files(preload=True):
@@ -70,7 +92,6 @@ def load_data(filename):
 #             ret.append(mne.io.read_raw_bdf(os.path.join(dir_path, file_name), preload=preload))
 #     return ret
 
-
 def set_reg_eog(raw, add_channels=None) -> mne.io.Raw:
     """
     :param raw: the raw input we want to set eog channels in
@@ -89,7 +110,6 @@ def set_reg_eog(raw, add_channels=None) -> mne.io.Raw:
     raw.set_channel_types(mapping=eog_map_dict)
     return raw
 
-
 def add_bipolar_derivation(raw: mne.io.Raw, ch_1: str, ch_2: str) -> mne.io.Raw:
     """
     adds a channel to the given raw instance that is ch_1-ch_2
@@ -100,14 +120,13 @@ def add_bipolar_derivation(raw: mne.io.Raw, ch_1: str, ch_2: str) -> mne.io.Raw:
     raw = mne.set_bipolar_reference(raw, ch_1, ch_2, drop_refs=False)
     return raw
 
-
 def process_epochs(trigger, epochs: mne.Epochs, notch_list=None, high_filter=30,
                    low_filter=1, samp_rate=2048):
     """
     Gal Chen this function is responsible for the processing of existing
-    'epochs' object and adding the relevant filters most parameters are
-    default but can be changed notch list is a list of amplitudes of line
-    noise to be filtered ouy obligatory: the specific trigger we epoch by (
+    'epochs' object and adding the relevant filters. most parameters are
+    default but can be changed. notch list is a list of amplitudes of line
+    noise to be filtered out. obligatory: the specific trigger we epoch by (
     "short words") and epochs object that was previously created
     """
     if notch_list is None:
@@ -117,7 +136,6 @@ def process_epochs(trigger, epochs: mne.Epochs, notch_list=None, high_filter=30,
     filt_epochs = mne.filter.notch_filter(filt_epochs, samp_rate, notch_list)
     filt_epochs.filter(l_freq=low_filter, h_freq=high_filter)
     return filt_epochs
-
 
 def load_raws_from_mat(mat_filename, raws) -> list:
     """
@@ -144,7 +162,6 @@ def load_raws_from_mat(mat_filename, raws) -> list:
                 print("parsing block", str(i) + "...")
                 arrays[i] = mne.io.RawArray(arr, raws[i].info)
     return arrays
-
 
 def plot_correlations(ica, raw, components, picks=None) -> None:
     """
@@ -191,7 +208,6 @@ def plot_correlations(ica, raw, components, picks=None) -> None:
     ica_raw.plot_psd(fmin=0, fmax=250, picks=components, n_fft=10 * 2048,
                      show=False, spatial_colors=False)
 
-
 def plot_all_channels_var(raw, max_val, threshold, remove_from_top=8) -> None:
     """
     plotting the variance by channel for selecting bad channels
@@ -223,7 +239,6 @@ def plot_all_channels_var(raw, max_val, threshold, remove_from_top=8) -> None:
     plt.ylabel("Variance")
     plt.xlabel("channel")
     plt.show()
-
 
 def annotate_bads_auto(raw, reject_criteria, jump_criteria,
                        reject_criteria_blink=200e-6) -> mne.io.Raw:
@@ -280,7 +295,6 @@ def annotate_bads_auto(raw, reject_criteria, jump_criteria,
     raw.set_annotations(annot)
     return raw
 
-
 def annotate_breaks(raw, trig=254, samp_rate=2048) -> mne.io.Raw:
     """
        Reads raw and  annotates, for every start trigger, the parts from the trigger
@@ -299,7 +313,6 @@ def annotate_breaks(raw, trig=254, samp_rate=2048) -> mne.io.Raw:
         events[i][2] == trig]  ##2 seconds before next (real) trigger after 254
     raw._annotations = mne.Annotations(event_times, next_trig_dur, 'BAD')
     return raw
-
 
 def fixation_saccade_variance_ratio(raw, ica, events,
                                     cut_before_event=10 / 1000,
@@ -599,66 +612,66 @@ def plot_ica_component(raw, ica, events, event_dict, stimuli, comp_start):
     root.destroy()
     return ica.exclude
 
-
-def ica_checker(raw, ica):
-    from tkinter.filedialog import askopenfilename
-    import matplotlib as mpl
-    mpl.use("tkAgg")
-    root = Tk()
-    root.withdraw()
-    raw = mne.io.read_raw_fif(askopenfilename(title="Please choose raw file"))
-    #    raw=mne.read_epochs("SavedResults/S2/det_epochs-epo.fif")
-    root.destroy()
-    raw.load_data()
-    raw.set_montage(montage=mne.channels.make_standard_montage('biosemi256',
-                                                               head_size=0.089),
-                    raise_if_subset=False)
-    raw.set_eeg_reference(ref_channels=['M1', 'M2'])
-
-    print("plotting psd...")
-    eog_map_dict = {'Nose': 'eeg', 'LHEOG': 'eeg', 'RHEOG': 'eeg',
-                    'RVEOGS': 'eeg', 'RVEOGI': 'eeg', 'M1': 'eeg',
-                    'M2': 'eeg', 'LVEOGI': 'eeg'}
-    raw.set_channel_types(mapping=eog_map_dict)
-    # raw.plot_psd(fmin=0, fmax=25, picks=range(20), n_fft=10 * 2048)
-    # plt.show()
-    #    ica = mne.preprocessing.read_ica(askopenfilename(title="Please choose ICA file"))
-    ica = mne.preprocessing.read_ica(input("file?"))
-    # print("plotting components...")
-    # ica.plot_components(picks=components, show=False)
-    # plt.show()
-    print('creating epochs for plotting components...')
-
-    events = mne.find_events(raw, stim_channel="Status", mask=255,
-                             min_duration=2 / 2048)
-    event_dict_aud = {'short_word': 12, 'long_word': 22}
-    event_dict_vis = {'short_face': 10, 'long_face': 20,
-                      'short_anim': 12, 'long_anim': 22,
-                      'short_obj': 14, 'long_obj': 24,
-                      'short_body': 16, 'long_body': 26}
-    epochs = mne.Epochs(raw, events, event_id=event_dict_vis, tmin=-0.4,
-                        baseline=(-0.25, -.10),
-                        tmax=1.9, preload=True, reject_by_annotation=True)
-
-    print("plotting properties...")
-    # the beginning of each components group to be shown
-    comp_jumps = np.linspace(0, ica.n_components_,
-                             int(ica.n_components_ / 8) + 1)
-    for i in range(
-            len(comp_jumps)):  # go over the components and show 8 each time
-        comps = range(int(comp_jumps[i]), int(comp_jumps[i + 1]))
-        print("plotting from component " + str(comps))
-        plot_correlations(ica, raw, components=comps,
-                          picks=['A19', 'Nose', 'RHEOG', 'LHEOG', 'RVEOGS',
-                                 'RVEOGI', 'M1', 'M2', 'LVEOGI'])
-
-        ica.plot_properties(epochs, picks=comps, show=False,
-                            psd_args={'fmax': 100})  # plot component properties
-        ica.plot_sources(epochs, picks=comps, show=False)  # plot sources
-        print("plotting")
-        plt.show()
-        if input("keep plotting? (Y/N)") == "N":
-            break
+#
+# def ica_checker(raw, ica):
+#     from tkinter.filedialog import askopenfilename
+#     import matplotlib as mpl
+#     mpl.use("tkAgg")
+#     root = Tk()
+#     root.withdraw()
+#     raw = mne.io.read_raw_fif(askopenfilename(title="Please choose raw file"))
+#     #    raw=mne.read_epochs("SavedResults/S2/det_epochs-epo.fif")
+#     root.destroy()
+#     raw.load_data()
+#     raw.set_montage(montage=mne.channels.make_standard_montage('biosemi256',
+#                                                                head_size=0.089),
+#                     raise_if_subset=False)
+#     raw.set_eeg_reference(ref_channels=['M1', 'M2'])
+#
+#     print("plotting psd...")
+#     eog_map_dict = {'Nose': 'eeg', 'LHEOG': 'eeg', 'RHEOG': 'eeg',
+#                     'RVEOGS': 'eeg', 'RVEOGI': 'eeg', 'M1': 'eeg',
+#                     'M2': 'eeg', 'LVEOGI': 'eeg'}
+#     raw.set_channel_types(mapping=eog_map_dict)
+#     # raw.plot_psd(fmin=0, fmax=25, picks=range(20), n_fft=10 * 2048)
+#     # plt.show()
+#     #    ica = mne.preprocessing.read_ica(askopenfilename(title="Please choose ICA file"))
+#     ica = mne.preprocessing.read_ica(input("file?"))
+#     # print("plotting components...")
+#     # ica.plot_components(picks=components, show=False)
+#     # plt.show()
+#     print('creating epochs for plotting components...')
+#
+#     events = mne.find_events(raw, stim_channel="Status", mask=255,
+#                              min_duration=2 / 2048)
+#     event_dict_aud = {'short_word': 12, 'long_word': 22}
+#     event_dict_vis = {'short_face': 10, 'long_face': 20,
+#                       'short_anim': 12, 'long_anim': 22,
+#                       'short_obj': 14, 'long_obj': 24,
+#                       'short_body': 16, 'long_body': 26}
+#     epochs = mne.Epochs(raw, events, event_id=event_dict_vis, tmin=-0.4,
+#                         baseline=(-0.25, -.10),
+#                         tmax=1.9, preload=True, reject_by_annotation=True)
+#
+#     print("plotting properties...")
+#     # the beginning of each components group to be shown
+#     comp_jumps = np.linspace(0, ica.n_components_,
+#                              int(ica.n_components_ / 8) + 1)
+#     for i in range(
+#             len(comp_jumps)):  # go over the components and show 8 each time
+#         comps = range(int(comp_jumps[i]), int(comp_jumps[i + 1]))
+#         print("plotting from component " + str(comps))
+#         plot_correlations(ica, raw, components=comps,
+#                           picks=['A19', 'Nose', 'RHEOG', 'LHEOG', 'RVEOGS',
+#                                  'RVEOGI', 'M1', 'M2', 'LVEOGI'])
+#
+#         ica.plot_properties(epochs, picks=comps, show=False,
+#                             psd_args={'fmax': 100})  # plot component properties
+#         ica.plot_sources(epochs, picks=comps, show=False)  # plot sources
+#         print("plotting")
+#         plt.show()
+#         if input("keep plotting? (Y/N)") == "N":
+#             break
 
 
 def multiply_event(raw, event_dict, events, saccade_id=98,
@@ -668,7 +681,7 @@ def multiply_event(raw, event_dict, events, saccade_id=98,
     The function creates a new raw data for ICA,
      with the extension being a multiplication of allwanted events, in order to create dominant components in the ICA.
      Stages:
-     1. Cut all data between (-100)-1700 after stimulus onset
+     1. Cut all data between (-100)-2000 after stimulus onset
      2. Cut all data between 30ms before to 50 ms after every saccade onset and create new raw file
      3. Add to one raw file
 
@@ -704,13 +717,14 @@ def multiply_event(raw, event_dict, events, saccade_id=98,
                                # reject based time between trial onset and 1500 after
                                preload=True,
                                reject_by_annotation=True)  # currently includes mean-centering - should we?
-
-    threshold = get_rejection_threshold(epochs_trials)[0]
-    print(threshold)
-    n_trials = len(epochs_trials)
-    epochs_trials.drop_bad(reject=threshold)
-    print(
-        f"removed {n_trials - len(epochs_trials)} trials by peak to peak rejection with threshold {threshold['eeg']}")
+    # rejection by peak to peak - currently not applied!
+    # we don't want to reject blinks so we will rely on manual rejection instead.
+    # threshold = get_rejection_threshold(epochs_trials)[0]
+    # print(threshold)
+    # n_trials = len(epochs_trials)
+    # epochs_trials.drop_bad(reject=threshold)
+    # print(
+    #     f"removed {n_trials - len(epochs_trials)} trials by peak to peak rejection with threshold {threshold['eeg']}")
     epochs_trials.plot()
     data_t = np.hstack(epochs_trials.get_data())
 
@@ -722,7 +736,7 @@ def multiply_event(raw, event_dict, events, saccade_id=98,
     #     raw_multiplied = mne.concatenate_raws([raw_multiplied, raw_for_ica])
     #     print(f"length is multiplied by {i + 2}")
 
-    return raw_multiplied, threshold
+    return raw_multiplied#, threshold
 
 
 def duration_tracking(epo_A, epo_B, time_diff, p_thresh=0.01) -> np.array:
@@ -982,7 +996,6 @@ def raw_annotate_peak_to_peak(raw: mne.io.Raw,
     # epochs that contained peak to peak voltage above the threshold
     raw._annotations.append(raw.times[starts[reject]], reject_tmax - reject_tmin, 'BAD_')
 
-
 def total_onset_power(epochs, channel, time_start=0.1, time_stop=0.5, nperm=2000, cluster_thresh_t=1, alpha=0.05):
     """
     An electrode is marked as onset responsive if there is at least 1 significant cluster between 100 to 500 ms.
@@ -1006,7 +1019,6 @@ def total_onset_power(epochs, channel, time_start=0.1, time_stop=0.5, nperm=2000
             out_type='mask', verbose='ERROR')
     responsivnes_score = np.mean(T_obs) * (sum(cluster_p_values < alpha) > 0)  # send to zero if no significant cluster
     return responsivnes_score, np.mean(T_obs), cluster_p_values
-
 
 def plot_evokeds_with_CI(epochs_dict,channel,colors_dict, ci='se', title=" ", vlines=[], alpha=0.05, nperm=1000, cluster_thresh_t=1):
     """
@@ -1035,6 +1047,15 @@ def plot_evokeds_with_CI(epochs_dict,channel,colors_dict, ci='se', title=" ", vl
     times = epochs_dict[epochs_names[0]].times
     plt.figure()
     plt.axhline(0,color='black',lw=0.75)
+    sig_clust = [clusters[i] for i in range(len(clusters)) if cluster_p_values[i] < alpha]
+    sig_times_min = [np.min(times[curr_sig_clust]) for curr_sig_clust in sig_clust]
+    sig_times_max = [np.max(times[curr_sig_clust]) for curr_sig_clust in sig_clust]
+    for j in range(len(sig_times_min)):
+        minsig, maxsig = epochs_dict[epochs_names[0]].time_as_index([sig_times_min[j], sig_times_max[j]])
+        print(minsig, maxsig)
+        plt.axhline(np.max(np.mean(epochs_perm_A, axis=0)), xmin=minsig / epochs_perm_A.shape[1],
+                    xmax=maxsig / epochs_perm_A.shape[1],
+                    color="black", lw=3, label=f"significant at p<{alpha} in cluster permutations")
     for vline in vlines:
         plt.axvline(vline, color='black', linestyle="--",lw=0.75)
     for name in epochs_dict.keys():
@@ -1049,3 +1070,5 @@ def plot_evokeds_with_CI(epochs_dict,channel,colors_dict, ci='se', title=" ", vl
         plt.fill_between(times, under_line, over_line, color=colors_dict[name], alpha=.1)  # std curves.
         plt.title(title)
         plt.legend()
+    plt.xlabel('time(s)')
+    return T_obs, clusters, cluster_p_values, H0, sig_clust

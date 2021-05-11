@@ -79,7 +79,7 @@ raw_for_ica.info['bads'] = raw.info['bads']
 # %% fit ICA
 ica = mne.preprocessing.ICA(n_components=.95, method='infomax',
                             random_state=97, max_iter=800, fit_params=dict(extended=True))
-ica.fit(raw_for_ica, reject_by_annotation=True, reject=threshold_autoreject)
+ica.fit(raw_for_ica, reject_by_annotation=True)
 
 ica.save(join(save_dir, f"sub-{subject_num}_task-{modality}-{low_cutoff_freq:.2f}hpf-overweighted-ica.fif"))
 raw.save(join(save_dir, filename),
